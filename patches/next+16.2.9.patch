@@ -24,7 +24,7 @@ index 4f4a219..00766f9 100644
                          cause: err
                      }), "__NEXT_ERROR_CODE", {
 diff --git a/node_modules/next/dist/server/lib/router-utils/instrumentation-globals.external.js b/node_modules/next/dist/server/lib/router-utils/instrumentation-globals.external.js
-index c0b36f2..8cc59ab 100644
+index c0b36f2..ee4b207 100644
 --- a/node_modules/next/dist/server/lib/router-utils/instrumentation-globals.external.js
 +++ b/node_modules/next/dist/server/lib/router-utils/instrumentation-globals.external.js
 @@ -24,11 +24,17 @@ _export(exports, {
@@ -36,7 +36,7 @@ index c0b36f2..8cc59ab 100644
 -const _constants = require("../../../lib/constants");
 -const _interopdefault = require("../../../lib/interop-default");
 -const _instrumentationnodeextensions = require("./instrumentation-node-extensions");
-+const _safeRequire = typeof require !== 'undefined' ? require : function(moduleName) {
++const _safeRequire = (typeof module !== 'undefined' && typeof module.require === 'function') ? module.require.bind(module) : function(moduleName) {
 +    if (moduleName === "node:path") {
 +        return { join: function(...args) { return args.join('/'); } };
 +    }
