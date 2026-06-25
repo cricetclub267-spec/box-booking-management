@@ -166,6 +166,7 @@ export default function ReportsPage() {
             <DatePicker
               value={endDate}
               onChange={(val) => setEndDate(val)}
+              align="end"
             />
           </div>
         </div>

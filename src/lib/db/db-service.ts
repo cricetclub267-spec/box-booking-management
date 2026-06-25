@@ -20,6 +20,34 @@ export const getGrounds = async (): Promise<Ground[]> => {
       console.error('Supabase getGrounds error, falling back to mock:', error);
       return mockDb.getGrounds();
     }
+    
+    // Auto-seed grounds if table is empty and user is authenticated
+    if (data && data.length === 0) {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session) {
+          console.log('Grounds table is empty. Seeding default grounds...');
+          const defaultGrounds = [
+            { name: 'Ground A (Premium Turf)', hourly_rate: 1200.00 },
+            { name: 'Ground B (Standard Turf)', hourly_rate: 1000.00 }
+          ];
+          const { data: insertedData, error: insertError } = await supabase
+            .from('grounds')
+            .insert(defaultGrounds)
+            .select();
+          
+          if (!insertError && insertedData) {
+            console.log('Seeded grounds successfully:', insertedData);
+            return insertedData;
+          } else {
+            console.error('Failed to seed grounds:', insertError);
+          }
+        }
+      } catch (seedErr) {
+        console.error('Error seeding grounds:', seedErr);
+      }
+    }
+    
     return data || [];
   }
   return mockDb.getGrounds();

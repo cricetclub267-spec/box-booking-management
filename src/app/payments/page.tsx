@@ -486,6 +486,7 @@ export default function PaymentsPage() {
                     step="any"
                     value={logAmount}
                     onChange={(e) => setLogAmount(e.target.value)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted/20 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs transition-all font-bold"
                   />
                 </div>

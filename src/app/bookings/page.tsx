@@ -1795,13 +1795,13 @@ function BookingsContent() {
                         </button>
                         <button
                           type="button"
-                          disabled={!formDate || selectedSlots.length === 0}
+                          disabled={!formGroundId || !formDate || selectedSlots.length === 0}
                           onClick={() => {
                             setFormError(null);
                             setWizardStep(3);
                           }}
                           className={`py-2.5 px-6 rounded-xl text-xs font-extrabold transition-all ${
-                            formDate && selectedSlots.length > 0
+                            formGroundId && formDate && selectedSlots.length > 0
                               ? 'bg-white hover:bg-emerald-50 text-[#0c4a28] shadow-md cursor-pointer'
                               : 'bg-emerald-900/40 text-emerald-400/50 cursor-not-allowed border-none'
                           }`}
@@ -1856,6 +1856,7 @@ function BookingsContent() {
                         max={calculateTotalPrice()}
                         value={formDiscount}
                         onChange={(e) => setFormDiscount(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className="w-full px-3 py-2 bg-muted/25 border border-border rounded-xl text-xs font-bold focus:outline-none"
                       />
                     </div>
@@ -1971,6 +1972,7 @@ function BookingsContent() {
                           max={calculateFinalAmount()}
                           value={upiSplitAmount}
                           onChange={(e) => handleUpiSplitChange(e.target.value)}
+                          onWheel={(e) => e.currentTarget.blur()}
                           className="w-full px-3 py-2 bg-card border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none"
                         />
                       </div>
@@ -1982,6 +1984,7 @@ function BookingsContent() {
                           max={calculateFinalAmount()}
                           value={cashSplitAmount}
                           onChange={(e) => handleCashSplitChange(e.target.value)}
+                          onWheel={(e) => e.currentTarget.blur()}
                           className="w-full px-3 py-2 bg-card border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none"
                         />
                       </div>
@@ -2132,6 +2135,7 @@ function BookingsContent() {
                   step="any"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
+                  onWheel={(e) => e.currentTarget.blur()}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted/20 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs transition-all font-bold"
                 />
               </div>

@@ -56,7 +56,7 @@ export const DropdownMenuContent: React.FC<{
   if (!context) throw new Error('DropdownMenuContent must be used within a DropdownMenu');
   const { open } = context;
 
-  let alignClass = 'right-0';
+  let alignClass = 'left-0 sm:left-auto sm:right-0';
   if (align === 'start') alignClass = 'left-0';
   if (align === 'center') alignClass = 'left-1/2 -translate-x-1/2';
 

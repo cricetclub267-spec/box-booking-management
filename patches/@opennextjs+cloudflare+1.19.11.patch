@@ -1,0 +1,91 @@
+diff --git a/node_modules/@opennextjs/cloudflare/dist/cli/build/patches/plugins/next-server.js b/node_modules/@opennextjs/cloudflare/dist/cli/build/patches/plugins/next-server.js
+index d816e83..84e0f66 100644
+--- a/node_modules/@opennextjs/cloudflare/dist/cli/build/patches/plugins/next-server.js
++++ b/node_modules/@opennextjs/cloudflare/dist/cli/build/patches/plugins/next-server.js
+@@ -83,10 +83,10 @@ fix: |-
+ export function createComposableCacheHandlersRule(handlerPath) {
+     return `
+ rule:
+-  # matches
+-  # - const { cacheHandlers } = this.nextConfig.experimental; pre Next 16
++  # matches only the NextNodeServer version that uses this.nextConfig directly
+   # - const { cacheMaxMemorySize, cacheHandlers } = this.nextConfig; from Next 16
+-  kind: lexical_declaration
++  # Does NOT match the RouteModule version that receives config as a parameter
++  pattern: "const { $$$VARS } = this.nextConfig;"
+   regex: cacheHandlers
+   inside:
+     kind: method_definition
+@@ -96,7 +96,7 @@ rule:
+     stopBy: end
+ 
+ fix: |-
+-  const cacheHandlers = null;
++  const { cacheMaxMemorySize: e, cacheHandlers: t } = this.nextConfig;
+   const handlersSymbol = Symbol.for('@next/cache-handlers');
+   const handlersMapSymbol = Symbol.for('@next/cache-handlers-map');
+   const handlersSetSymbol = Symbol.for('@next/cache-handlers-set');
+diff --git a/node_modules/@opennextjs/cloudflare/dist/cli/build/patches/plugins/turbopack.js b/node_modules/@opennextjs/cloudflare/dist/cli/build/patches/plugins/turbopack.js
+index 4f0e134..1362004 100644
+--- a/node_modules/@opennextjs/cloudflare/dist/cli/build/patches/plugins/turbopack.js
++++ b/node_modules/@opennextjs/cloudflare/dist/cli/build/patches/plugins/turbopack.js
+@@ -66,7 +66,9 @@ fix: |-
+ function discoverExternalModuleMappings(filePath) {
+     // filePath is like: .../.next/server/chunks/ssr/[turbopack]_runtime.js
+     // We need: .../.next/node_modules/
+-    const dotNextDir = filePath.replace(/\/server\/chunks\/.*$/, "");
++    // Normalize backslashes to forward slashes for Windows compatibility
++    const normalizedFilePath = filePath.replaceAll("\\", "/");
++    const dotNextDir = normalizedFilePath.replace(/\/server\/chunks\/.*$/, "");
+     const nodeModulesDir = path.join(dotNextDir, "node_modules");
+     const mappings = new Map();
+     if (!fs.existsSync(nodeModulesDir)) {
+@@ -166,7 +168,7 @@ function discoverBareExternalImports(tracedFiles, runtimeCode) {
+     const externalImportAlias = propMatch[1];
+     // Chunks call externalImport as e.g. `.y("shiki")` — build a regex using the discovered property name.
+     const externalImportRegexp = new RegExp(`\\.${externalImportAlias}\\("([^"]+)"\\)`, "g");
+-    const chunkFiles = tracedFiles.filter((f) => f.includes(".next/server/chunks/"));
++    const chunkFiles = tracedFiles.filter((f) => f.replaceAll("\\", "/").includes(".next/server/chunks/"));
+     for (const filePath of chunkFiles) {
+         try {
+             const content = fs.readFileSync(filePath, "utf-8");
+@@ -248,7 +250,8 @@ function getInlinableChunks(tracedFiles) {
+         if (file === "[turbopack]_runtime.js") {
+             continue;
+         }
+-        if (file.includes(".next/server/chunks/")) {
++        // Normalize backslashes to forward slashes for Windows compatibility
++        if (file.replaceAll("\\", "/").includes(".next/server/chunks/")) {
+             chunks.add(file);
+         }
+     }
+@@ -261,9 +264,13 @@ function inlineChunksFn(tracedFiles) {
+   function requireChunk(chunkPath) {
+     switch(chunkPath) {
+ ${chunks
+-        .map((chunk) => `      case "${
++        .map((chunk) => {
++    // Normalize backslashes to forward slashes for Windows compatibility
++    const normalizedChunk = chunk.replaceAll("\\", "/");
+     // we only want the path after /path/to/.next/
+-    chunk.replace(/.*\/\.next\//, "")}": return require("${chunk}");`)
++    const casePath = normalizedChunk.replace(/.*\/\.next\//, "");
++    return `      case "${casePath}": return require("${normalizedChunk}");`;
++  })
+         .join("\n")}
+       default:
+         throw new Error(\`Not found \${chunkPath}\`);
+@@ -282,7 +289,12 @@ ${chunks
+ export function loadWasmChunkFn(tracedFiles) {
+     const wasmFiles = tracedFiles.filter((f) => f.endsWith(".wasm"));
+     const cases = wasmFiles
+-        .map((absPath) => ({ absPath, relPath: absPath.replace(/.*\/\.next\//, "") }))
++        .map((absPath) => {
++    // Normalize backslashes to forward slashes for Windows compatibility
++    const normalizedPath = absPath.replaceAll("\\", "/");
++    const relPath = normalizedPath.replace(/.*\/\.next\//, "");
++    return { absPath: normalizedPath, relPath };
++  })
+         .map(({ absPath, relPath }) => `      case "${relPath}": return (await import("${absPath}")).default;`)
+         .join("\n");
+     return `
