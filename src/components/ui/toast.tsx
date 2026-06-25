@@ -50,7 +50,7 @@ export function ToastContainer() {
 
   return (
     <div className="fixed top-6 right-6 z-[9999] flex flex-col gap-3 w-full max-w-[340px] sm:max-w-sm pointer-events-none px-4 sm:px-0">
-      <AnimatePresence mode="pop-layout">
+      <AnimatePresence mode="popLayout">
         {toasts.map((toast) => (
           <ToastItem key={toast.id} toast={toast} />
         ))}

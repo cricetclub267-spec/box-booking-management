@@ -5,6 +5,11 @@ import { ToastContainer } from "@/components/ui/toast";
 export const metadata: Metadata = {
   title: "360 Club Box Management Dashboard",
   description: "Manage cricket turf bookings, payments, and customers with ease",
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

@@ -4,14 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useToastStore } from '@/lib/store/toast-store';
-import { sanitizeInput, checkRateLimit } from '@/lib/security';
+import { sanitizeInput, checkRateLimit, resetRateLimit } from '@/lib/security';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
 import { LogIn, Key, Mail, ShieldAlert, UserCheck, Phone, ArrowLeft } from 'lucide-react';
 import { logActivity, getUserProfileByPhone } from '@/lib/db/db-service';
 import { supabase, hasSupabaseCredentials } from '@/lib/db/supabase';
-
 
 const loginSchema = zod.object({
   phone: zod.string().regex(/^\d{10}$/, 'Please enter a valid 10-digit phone number'),
