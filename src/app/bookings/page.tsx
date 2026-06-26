@@ -90,6 +90,10 @@ function BookingsContent() {
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('UPI');
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [collectPaymentMode, setCollectPaymentMode] = useState<'UPI' | 'Cash' | 'Split' | 'Other'>('UPI');
+  const [collectUpiSplit, setCollectUpiSplit] = useState<string>('0');
+  const [collectCashSplit, setCollectCashSplit] = useState<string>('0');
+  const [collectOtherMethod, setCollectOtherMethod] = useState<'Card' | 'Bank Transfer'>('Card');
 
   // Booking Form States
   const [formGroundId, setFormGroundId] = useState('');
@@ -965,6 +969,21 @@ function BookingsContent() {
     }
   };
 
+  // Helper handlers for split inputs change in Log Payment modal
+  const handleCollectUpiChange = (val: string) => {
+    setCollectUpiSplit(val);
+    const upi = Number(val) || 0;
+    const cash = Number(collectCashSplit) || 0;
+    setPaymentAmount((upi + cash).toString());
+  };
+
+  const handleCollectCashChange = (val: string) => {
+    setCollectCashSplit(val);
+    const upi = Number(collectUpiSplit) || 0;
+    const cash = Number(val) || 0;
+    setPaymentAmount((upi + cash).toString());
+  };
+
   // Add payment action
   const handleLogPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -980,35 +999,72 @@ function BookingsContent() {
       return;
     }
 
-    const amt = Number(paymentAmount);
-    if (!amt || amt <= 0) {
-      const errMsg = 'Please enter a valid amount greater than 0';
-      setPaymentError(errMsg);
-      showToast(errMsg, 'error');
-      return;
-    }
+    const outstanding = (paymentSummaries[selectedBooking.id]?.pendingAmount || 0);
 
     try {
-      const summary = await getBookingPaymentSummary(selectedBooking.id);
-      const remaining = summary.pendingAmount;
+      if (collectPaymentMode === 'Split') {
+        const upiVal = Number(collectUpiSplit) || 0;
+        const cashVal = Number(collectCashSplit) || 0;
+        const total = upiVal + cashVal;
 
-      await addPayment({
-        booking_id: selectedBooking.id,
-        amount_paid: amt,
-        payment_method: paymentMethod,
-        payment_status: amt >= remaining ? 'Paid' : 'Partial'
-      }, user?.email);
+        if (total <= 0) {
+          throw new Error('Total payment amount must be greater than 0');
+        }
+        if (total > outstanding) {
+          throw new Error(`Total payment amount (₹${total}) exceeds outstanding balance (₹${outstanding})`);
+        }
+
+        // Add separate payments for UPI and Cash
+        if (upiVal > 0) {
+          await addPayment({
+            booking_id: selectedBooking.id,
+            amount_paid: upiVal,
+            payment_method: 'UPI',
+            payment_status: total >= outstanding ? 'Paid' : 'Partial'
+          }, user?.email);
+        }
+
+        if (cashVal > 0) {
+          await addPayment({
+            booking_id: selectedBooking.id,
+            amount_paid: cashVal,
+            payment_method: 'Cash',
+            payment_status: total >= outstanding ? 'Paid' : 'Partial'
+          }, user?.email);
+        }
+
+        showToast(`Logged split payment of ₹${total} (UPI: ₹${upiVal}, Cash: ₹${cashVal}) successfully!`, 'success');
+
+      } else {
+        const amt = Number(paymentAmount) || 0;
+        if (amt <= 0) {
+          throw new Error('Payment amount must be greater than 0');
+        }
+        if (amt > outstanding) {
+          throw new Error(`Payment amount (₹${amt}) exceeds outstanding balance (₹${outstanding})`);
+        }
+
+        const method = collectPaymentMode === 'Other' ? collectOtherMethod : collectPaymentMode;
+
+        await addPayment({
+          booking_id: selectedBooking.id,
+          amount_paid: amt,
+          payment_method: method,
+          payment_status: amt >= outstanding ? 'Paid' : 'Partial'
+        }, user?.email);
+
+        showToast(`Logged payment of ₹${amt} via ${method} successfully!`, 'success');
+      }
 
       setPaymentAmount('');
       setShowPaymentModal(false);
       
-      // Reload booking detail
+      // Reload booking detail and all data
+      await loadAllData(true);
       const refreshedBookings = await getBookings();
       setBookings(refreshedBookings);
       const updatedB = refreshedBookings.find(b => b.id === selectedBooking.id);
       if (updatedB) setSelectedBooking(updatedB);
-      
-      showToast(`Logged payment of ₹${amt} successfully!`, 'success');
 
     } catch (err: any) {
       const errMsg = err.message || 'Failed to log payment';
@@ -1080,7 +1136,7 @@ function BookingsContent() {
                   {/* Grounds Grid Cells */}
                   {activeGrounds.map(ground => {
                     const booking = getBookingForSlot(ground.id, dateStr, slot);
-                    const isStart = booking && booking.start_time === slot;
+                    const isStart = booking && normalizeTime(booking.start_time) === normalizeTime(slot);
                     const isPast = isSlotInPast(dateStr, slot);
 
                     let cardClass = '';
@@ -1223,7 +1279,7 @@ function BookingsContent() {
                 {weekDates.map(date => {
                   const dateStr = getFormattedDate(date);
                   const booking = getBookingForSlot(groundId, dateStr, slot);
-                  const isStart = booking && booking.start_time === slot;
+                  const isStart = booking && normalizeTime(booking.start_time) === normalizeTime(slot);
                   const isPast = isSlotInPast(dateStr, slot);
 
                   let cardClass = '';
@@ -1615,7 +1671,11 @@ function BookingsContent() {
                     {selectedBooking.id && (paymentSummaries[selectedBooking.id]?.pendingAmount || 0) > 0 && (
                       <button
                         onClick={() => {
-                          setPaymentAmount((paymentSummaries[selectedBooking.id]?.pendingAmount || 0).toString());
+                          const pending = paymentSummaries[selectedBooking.id]?.pendingAmount || 0;
+                          setPaymentAmount(pending.toString());
+                          setCollectPaymentMode('UPI');
+                          setCollectUpiSplit(pending.toString());
+                          setCollectCashSplit('0');
                           setPaymentError(null);
                           setShowPaymentModal(true);
                         }}
@@ -2552,32 +2612,104 @@ function BookingsContent() {
                 </p>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Amount Received (₹)</label>
-                <input
-                  type="number"
-                  min={0.01}
-                  step="any"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  onWheel={(e) => e.currentTarget.blur()}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted/20 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs transition-all font-bold"
-                />
+              {/* Payment Mode Selector */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Payment Mode</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {(['UPI', 'Cash', 'Split', 'Other'] as const).map(mode => {
+                    const isSelected = collectPaymentMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          setCollectPaymentMode(mode);
+                          setPaymentError(null);
+                          const total = Number(paymentSummaries[selectedBooking.id]?.pendingAmount || 0);
+                          if (mode === 'Split') {
+                            setCollectUpiSplit(Math.round(total / 2).toString());
+                            setCollectCashSplit((total - Math.round(total / 2)).toString());
+                            setPaymentAmount(total.toString());
+                          } else {
+                            setPaymentAmount(total.toString());
+                          }
+                        }}
+                        className={`py-2.5 px-1 rounded-xl text-xs font-bold cursor-pointer transition-all text-center ${
+                          isSelected
+                            ? 'bg-primary text-white border-primary shadow-sm shadow-primary/10 font-black'
+                            : 'bg-card border-border hover:bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Payment Mode</label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                  className="w-full px-3.5 py-2.5 bg-muted/20 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="UPI">UPI</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Card">Card</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                </select>
-              </div>
+              {/* Conditional inputs */}
+              {collectPaymentMode === 'Split' ? (
+                <div className="grid grid-cols-2 gap-4 bg-muted/20 rounded-xl p-4 border border-border/50">
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">UPI Amount (₹)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={collectUpiSplit}
+                      onChange={(e) => handleCollectUpiChange(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className="w-full px-3 py-2 bg-card border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cash Amount (₹)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={collectCashSplit}
+                      onChange={(e) => handleCollectCashChange(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className="w-full px-3 py-2 bg-card border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none"
+                    />
+                  </div>
+                  <div className="col-span-2 text-[10px] font-bold text-muted-foreground text-center pt-1 border-t border-border/40">
+                    Total Collected: <strong className="text-primary font-black">₹{paymentAmount}</strong>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-1.5 text-left">
+                    <label className="text-xs font-semibold text-muted-foreground">Amount Received (₹)</label>
+                    <input
+                      type="number"
+                      min={0.01}
+                      step="any"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      onWheel={(e) => e.currentTarget.blur()}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted/20 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs transition-all font-bold"
+                    />
+                  </div>
+
+                  {collectPaymentMode === 'Other' && (
+                    <div className="space-y-1.5 text-left animate-fade-in">
+                      <label className="text-xs font-semibold text-muted-foreground">Select Method</label>
+                      <select
+                        value={collectOtherMethod}
+                        onChange={(e) => setCollectOtherMethod(e.target.value as 'Card' | 'Bank Transfer')}
+                        className="w-full px-3.5 py-2.5 bg-muted/20 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value="Card">Card</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="bg-muted/10 p-3 border border-border/40 rounded-xl text-xs font-semibold text-muted-foreground text-center">
+                    Payment of <strong className="text-primary font-black">₹{paymentAmount}</strong> will be logged via <strong className="uppercase">{collectPaymentMode === 'Other' ? collectOtherMethod : collectPaymentMode}</strong>.
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center gap-3 pt-4">
                 <button
