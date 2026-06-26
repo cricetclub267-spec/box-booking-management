@@ -7,22 +7,22 @@ import { Ground, Customer, Booking, Payment, ActivityLog, PaymentStatus, User } 
 export const HARDCODED_PARTNERS: User[] = [
   {
     id: '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1',
-    email: 'partner1@gmail.com',
-    phone: '9328021142',
+    email: 'partner1@example.com',
+    phone: '9999999991',
     role: 'partner',
     created_at: '2026-06-26T06:00:00.000Z'
   },
   {
     id: 'ad9e5590-db0e-4001-8bf7-df427e1f6e2a',
-    email: 'partner2@gmail.com',
-    phone: '9426481232',
+    email: 'partner2@example.com',
+    phone: '9999999992',
     role: 'partner',
     created_at: '2026-06-26T06:00:00.000Z'
   },
   {
     id: 'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a',
-    email: 'partner3@gmail.com',
-    phone: '9499745268',
+    email: 'partner3@example.com',
+    phone: '9999999993',
     role: 'partner',
     created_at: '2026-06-26T06:00:00.000Z'
   }
@@ -490,11 +490,11 @@ export const getUserProfileByPhone = async (phone: string): Promise<User | null>
   if (hcPartner) return hcPartner;
 
   // Check new admin
-  if (phone === '9824416051') {
+  if (phone === '9999999990') {
     return {
       id: 'c952ced9-32ab-4dd7-8bc8-607d5f3a5a67',
-      email: 'cricetclub267@gmail.com',
-      phone: '9824416051',
+      email: 'admin@example.com',
+      phone: '9999999990',
       role: 'admin',
       created_at: '2026-06-26T05:48:09.901189+00:00'
     };
@@ -522,11 +522,11 @@ export const getUserProfileByEmail = async (email: string): Promise<User | null>
   const hcPartner = HARDCODED_PARTNERS.find(u => u.email.toLowerCase() === normalizedEmail);
   if (hcPartner) return hcPartner;
 
-  if (normalizedEmail === 'cricetclub267@gmail.com') {
+  if (normalizedEmail === 'admin@example.com') {
     return {
       id: 'c952ced9-32ab-4dd7-8bc8-607d5f3a5a67',
-      email: 'cricetclub267@gmail.com',
-      phone: '9824416051',
+      email: 'admin@example.com',
+      phone: '9999999990',
       role: 'admin',
       created_at: '2026-06-26T05:48:09.901189+00:00'
     };

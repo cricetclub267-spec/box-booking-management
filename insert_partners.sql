@@ -4,7 +4,7 @@
 -- Enable pgcrypto extension if not already enabled (for password hashing)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- 1. Insert Partner 1 (partner1@gmail.com, 9328021142)
+-- 1. Insert Partner 1 (partner1@example.com, 9999999991)
 INSERT INTO auth.users (
   id,
   instance_id,
@@ -21,17 +21,17 @@ INSERT INTO auth.users (
 SELECT
   '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1',
   '00000000-0000-0000-0000-000000000000',
-  'partner1@gmail.com',
-  extensions.crypt('Subham@bhojani', extensions.gen_salt('bf')),
+  'partner1@example.com',
+  extensions.crypt('Partner1Pass@123', extensions.gen_salt('bf')),
   now(),
   '{"provider": "email", "providers": ["email"]}'::jsonb,
   '{}'::jsonb,
   now(),
   now(),
   'authenticated',
-  '9328021142'
+  '9999999991'
 WHERE NOT EXISTS (
-  SELECT 1 FROM auth.users WHERE email = 'partner1@gmail.com' OR phone = '9328021142' OR id = '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1'
+  SELECT 1 FROM auth.users WHERE email = 'partner1@example.com' OR phone = '9999999991' OR id = '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1'
 );
 
 INSERT INTO public.users (
@@ -43,16 +43,16 @@ INSERT INTO public.users (
 ) 
 SELECT
   '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1',
-  'partner1@gmail.com',
-  '9328021142',
+  'partner1@example.com',
+  '9999999991',
   'partner',
   now()
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.users WHERE email = 'partner1@gmail.com' OR phone = '9328021142' OR id = '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1'
+  SELECT 1 FROM public.users WHERE email = 'partner1@example.com' OR phone = '9999999991' OR id = '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1'
 );
 
 
--- 2. Insert Partner 2 (partner2@gmail.com, 9426481232)
+-- 2. Insert Partner 2 (partner2@example.com, 9999999992)
 INSERT INTO auth.users (
   id,
   instance_id,
@@ -69,17 +69,17 @@ INSERT INTO auth.users (
 SELECT
   'ad9e5590-db0e-4001-8bf7-df427e1f6e2a',
   '00000000-0000-0000-0000-000000000000',
-  'partner2@gmail.com',
-  extensions.crypt('Yatin@navdiya', extensions.gen_salt('bf')),
+  'partner2@example.com',
+  extensions.crypt('Partner2Pass@123', extensions.gen_salt('bf')),
   now(),
   '{"provider": "email", "providers": ["email"]}'::jsonb,
   '{}'::jsonb,
   now(),
   now(),
   'authenticated',
-  '9426481232'
+  '9999999992'
 WHERE NOT EXISTS (
-  SELECT 1 FROM auth.users WHERE email = 'partner2@gmail.com' OR phone = '9426481232' OR id = 'ad9e5590-db0e-4001-8bf7-df427e1f6e2a'
+  SELECT 1 FROM auth.users WHERE email = 'partner2@example.com' OR phone = '9999999992' OR id = 'ad9e5590-db0e-4001-8bf7-df427e1f6e2a'
 );
 
 INSERT INTO public.users (
@@ -91,16 +91,16 @@ INSERT INTO public.users (
 ) 
 SELECT
   'ad9e5590-db0e-4001-8bf7-df427e1f6e2a',
-  'partner2@gmail.com',
-  '9426481232',
+  'partner2@example.com',
+  '9999999992',
   'partner',
   now()
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.users WHERE email = 'partner2@gmail.com' OR phone = '9426481232' OR id = 'ad9e5590-db0e-4001-8bf7-df427e1f6e2a'
+  SELECT 1 FROM public.users WHERE email = 'partner2@example.com' OR phone = '9999999992' OR id = 'ad9e5590-db0e-4001-8bf7-df427e1f6e2a'
 );
 
 
--- 3. Insert Partner 3 (partner3@gmail.com, 9499745268)
+-- 3. Insert Partner 3 (partner3@example.com, 9999999993)
 INSERT INTO auth.users (
   id,
   instance_id,
@@ -117,17 +117,17 @@ INSERT INTO auth.users (
 SELECT
   'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a',
   '00000000-0000-0000-0000-000000000000',
-  'partner3@gmail.com',
-  extensions.crypt('Subham@sivo', extensions.gen_salt('bf')),
+  'partner3@example.com',
+  extensions.crypt('Partner3Pass@123', extensions.gen_salt('bf')),
   now(),
   '{"provider": "email", "providers": ["email"]}'::jsonb,
   '{}'::jsonb,
   now(),
   now(),
   'authenticated',
-  '9499745268'
+  '9999999993'
 WHERE NOT EXISTS (
-  SELECT 1 FROM auth.users WHERE email = 'partner3@gmail.com' OR phone = '9499745268' OR id = 'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a'
+  SELECT 1 FROM auth.users WHERE email = 'partner3@example.com' OR phone = '9999999993' OR id = 'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a'
 );
 
 INSERT INTO public.users (
@@ -139,10 +139,10 @@ INSERT INTO public.users (
 ) 
 SELECT
   'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a',
-  'partner3@gmail.com',
-  '9499745268',
+  'partner3@example.com',
+  '9999999993',
   'partner',
   now()
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.users WHERE email = 'partner3@gmail.com' OR phone = '9499745268' OR id = 'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a'
+  SELECT 1 FROM public.users WHERE email = 'partner3@example.com' OR phone = '9999999993' OR id = 'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a'
 );

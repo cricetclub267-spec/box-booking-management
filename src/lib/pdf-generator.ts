@@ -323,7 +323,7 @@ export const exportRevenueReportPDF = async (
       b.id.substring(0, 8),
       new Date(b.booking_date).toLocaleDateString(),
       b.customer?.name || 'Walk-in',
-      b.ground?.name.split(' ')[0] || 'Ground',
+      b.ground?.name.split(' (')[0] || 'Ground',
       `₹${b.final_amount}`,
       paidText,
       `₹${summary ? summary.pendingAmount : 0}`,

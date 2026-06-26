@@ -335,7 +335,7 @@ export default function DashboardPage() {
                       <div key={b.id} className="flex items-center justify-between p-2.5 border border-border/60 bg-muted/20 rounded-xl text-xs font-semibold">
                         <div className="min-w-0">
                           <p className="text-foreground truncate">{b.customer?.name}</p>
-                          <p className="text-[9px] text-muted-foreground mt-0.5">{b.ground?.name.split(' ')[0]}</p>
+                          <p className="text-[9px] text-muted-foreground mt-0.5">{b.ground?.name.split(' (')[0]}</p>
                         </div>
                         <span className="text-[10px] text-primary bg-accent border border-primary/20 rounded-lg px-2 py-0.5 font-bold shrink-0">
                           {b.start_time} - {b.end_time}

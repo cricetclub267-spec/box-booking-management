@@ -524,10 +524,7 @@ function BookingsContent() {
       }
       setPaymentSummaries(summaries);
 
-      // Prepopulate form ground if grounds exist
-      if (g.length > 0 && !formGroundId) {
-        setFormGroundId(g[0].id);
-      }
+
     } catch (e: any) {
       console.error(e);
       showToast(`Database error: ${e.message || e}`, 'error');
@@ -2128,7 +2125,7 @@ function BookingsContent() {
                           const otherGroundsBooked = grounds
                             .filter(g => g.id !== formGroundId)
                             .filter(g => isSlotBooked(g.id, formDate, slot));
-                          const otherBookedNames = otherGroundsBooked.map(g => g.name.split(' ')[0]).join(', ');
+                          const otherBookedNames = otherGroundsBooked.map(g => g.name.split(' (')[0]).join(', ');
 
                           if (isBooked) {
                             return (
