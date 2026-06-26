@@ -90,10 +90,9 @@ function BookingsContent() {
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('UPI');
   const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [collectPaymentMode, setCollectPaymentMode] = useState<'UPI' | 'Cash' | 'Split' | 'Other'>('UPI');
+  const [collectPaymentMode, setCollectPaymentMode] = useState<'UPI' | 'Cash' | 'Split'>('UPI');
   const [collectUpiSplit, setCollectUpiSplit] = useState<string>('0');
   const [collectCashSplit, setCollectCashSplit] = useState<string>('0');
-  const [collectOtherMethod, setCollectOtherMethod] = useState<'Card' | 'Bank Transfer'>('Card');
 
   // Booking Form States
   const [formGroundId, setFormGroundId] = useState('');
@@ -971,17 +970,36 @@ function BookingsContent() {
 
   // Helper handlers for split inputs change in Log Payment modal
   const handleCollectUpiChange = (val: string) => {
-    setCollectUpiSplit(val);
-    const upi = Number(val) || 0;
-    const cash = Number(collectCashSplit) || 0;
-    setPaymentAmount((upi + cash).toString());
+    const total = Number(paymentAmount) || 0;
+    const numVal = Number(val) || 0;
+    if (numVal > total) {
+      setCollectUpiSplit(total.toString());
+      setCollectCashSplit('0');
+    } else {
+      setCollectUpiSplit(val);
+      setCollectCashSplit((total - numVal).toString());
+    }
   };
 
   const handleCollectCashChange = (val: string) => {
-    setCollectCashSplit(val);
-    const upi = Number(collectUpiSplit) || 0;
-    const cash = Number(val) || 0;
-    setPaymentAmount((upi + cash).toString());
+    const total = Number(paymentAmount) || 0;
+    const numVal = Number(val) || 0;
+    if (numVal > total) {
+      setCollectCashSplit(total.toString());
+      setCollectUpiSplit('0');
+    } else {
+      setCollectCashSplit(val);
+      setCollectUpiSplit((total - numVal).toString());
+    }
+  };
+
+  const handleCollectTotalChange = (val: string) => {
+    setPaymentAmount(val);
+    const total = Number(val) || 0;
+    if (collectPaymentMode === 'Split') {
+      setCollectUpiSplit(Math.round(total / 2).toString());
+      setCollectCashSplit((total - Math.round(total / 2)).toString());
+    }
   };
 
   // Add payment action
@@ -1044,16 +1062,14 @@ function BookingsContent() {
           throw new Error(`Payment amount (₹${amt}) exceeds outstanding balance (₹${outstanding})`);
         }
 
-        const method = collectPaymentMode === 'Other' ? collectOtherMethod : collectPaymentMode;
-
         await addPayment({
           booking_id: selectedBooking.id,
           amount_paid: amt,
-          payment_method: method,
+          payment_method: collectPaymentMode,
           payment_status: amt >= outstanding ? 'Paid' : 'Partial'
         }, user?.email);
 
-        showToast(`Logged payment of ₹${amt} via ${method} successfully!`, 'success');
+        showToast(`Logged payment of ₹${amt} via ${collectPaymentMode} successfully!`, 'success');
       }
 
       setPaymentAmount('');
@@ -2615,8 +2631,8 @@ function BookingsContent() {
               {/* Payment Mode Selector */}
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Payment Mode</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['UPI', 'Cash', 'Split', 'Other'] as const).map(mode => {
+                <div className="grid grid-cols-3 gap-3">
+                  {(['UPI', 'Cash', 'Split'] as const).map(mode => {
                     const isSelected = collectPaymentMode === mode;
                     return (
                       <button
@@ -2685,28 +2701,14 @@ function BookingsContent() {
                       min={0.01}
                       step="any"
                       value={paymentAmount}
-                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      onChange={(e) => handleCollectTotalChange(e.target.value)}
                       onWheel={(e) => e.currentTarget.blur()}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted/20 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs transition-all font-bold"
                     />
                   </div>
 
-                  {collectPaymentMode === 'Other' && (
-                    <div className="space-y-1.5 text-left animate-fade-in">
-                      <label className="text-xs font-semibold text-muted-foreground">Select Method</label>
-                      <select
-                        value={collectOtherMethod}
-                        onChange={(e) => setCollectOtherMethod(e.target.value as 'Card' | 'Bank Transfer')}
-                        className="w-full px-3.5 py-2.5 bg-muted/20 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      >
-                        <option value="Card">Card</option>
-                        <option value="Bank Transfer">Bank Transfer</option>
-                      </select>
-                    </div>
-                  )}
-
                   <div className="bg-muted/10 p-3 border border-border/40 rounded-xl text-xs font-semibold text-muted-foreground text-center">
-                    Payment of <strong className="text-primary font-black">₹{paymentAmount}</strong> will be logged via <strong className="uppercase">{collectPaymentMode === 'Other' ? collectOtherMethod : collectPaymentMode}</strong>.
+                    Payment of <strong className="text-primary font-black">₹{paymentAmount}</strong> will be logged via <strong className="uppercase">{collectPaymentMode}</strong>.
                   </div>
                 </div>
               )}

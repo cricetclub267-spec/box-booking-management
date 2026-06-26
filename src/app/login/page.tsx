@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useToastStore } from '@/lib/store/toast-store';
 import { sanitizeInput, checkRateLimit, resetRateLimit } from '@/lib/security';
@@ -29,10 +30,20 @@ export default function LoginPage() {
 
   // Forgot Password State
   const [forgotMode, setForgotMode] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
+  const [resetInput, setResetInput] = useState('');
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetLoading, setResetLoading] = useState(false);
+  const [isLocalhost, setIsLocalhost] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsLocalhost(
+        window.location.hostname === 'localhost' || 
+        window.location.hostname === '127.0.0.1'
+      );
+    }
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -160,6 +171,11 @@ export default function LoginPage() {
         throw new Error('No user registered with this phone number.');
       }
 
+      // Check whether the profile belongs to admin or staff (partner)
+      if (profile.role !== 'admin' && profile.role !== 'partner') {
+        throw new Error('Access denied. This phone number does not belong to an Admin or Staff account.');
+      }
+
       // 3. Attempt auth sign-in with Supabase using mapped email
       if (hasSupabaseCredentials() && supabase) {
         const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -207,12 +223,28 @@ export default function LoginPage() {
     setResetError(null);
 
     try {
-      if (!resetEmail.trim() || !resetEmail.includes('@')) {
-        throw new Error('Please enter a valid email address');
+      const input = resetInput.trim();
+      if (!input) {
+        throw new Error('Please enter your registered phone number or email address');
+      }
+
+      let email = '';
+
+      if (input.match(/^\d{10}$/)) {
+        // Search user profile by phone
+        const profile = await getUserProfileByPhone(input);
+        if (!profile) {
+          throw new Error('No account found with this phone number');
+        }
+        email = profile.email;
+      } else if (input.includes('@')) {
+        email = input;
+      } else {
+        throw new Error('Please enter a valid 10-digit phone number or email address');
       }
 
       if (hasSupabaseCredentials() && supabase) {
-        const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/login/reset-password`,
         });
 
@@ -220,26 +252,24 @@ export default function LoginPage() {
           throw new Error(error.message);
         }
 
-        setResetSuccess('Password reset link sent! Please check your email inbox.');
+        const parts = email.split('@');
+        const maskedLocal = parts[0].length > 2 
+          ? parts[0].substring(0, 2) + '*'.repeat(parts[0].length - 2)
+          : parts[0] + '*';
+        const maskedEmail = `${maskedLocal}@${parts[1]}`;
+
+        setResetSuccess(`Password reset link sent to ${maskedEmail}! Please check your email inbox.`);
       } else {
-        setResetSuccess('Mock Mode: Password reset link sent! Redirect target: /login/reset-password');
+        setResetSuccess(`Mock Mode: Reset link generated for ${email}! Redirect target: /login/reset-password`);
       }
     } catch (err: any) {
-      setResetError(err.message || 'Failed to send password reset email');
+      setResetError(err.message || 'Failed to request password reset');
     } finally {
       setResetLoading(false);
     }
   };
 
-  const handleQuickLogin = (role: 'admin' | 'partner') => {
-    if (role === 'admin') {
-      setValue('phone', '9909108527');
-      setValue('password', 'Admin@123');
-    } else {
-      setValue('phone', '9876543210'); // partner placeholder
-      setValue('password', 'partner123');
-    }
-  };
+  // Quick fill option removed for security
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-accent/50 via-background to-background p-2 sm:p-4 font-sans">
@@ -271,7 +301,7 @@ export default function LoginPage() {
             <div className="space-y-4 sm:space-y-5 animate-fade-in">
               <div>
                 <h2 className="text-lg font-bold text-foreground">Forgot Password</h2>
-                <p className="text-xs text-muted-foreground mt-1">Enter your registered email address to receive a recovery link from Supabase.</p>
+                <p className="text-xs text-muted-foreground mt-1">Enter your registered mobile number or email address to receive a recovery link.</p>
               </div>
 
               {resetSuccess && (
@@ -289,24 +319,37 @@ export default function LoginPage() {
 
               <form onSubmit={handleForgotPassword} className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-foreground/80 block" htmlFor="resetEmail">
-                    Registered Email Address
+                  <label className="text-sm font-semibold text-foreground/80 block" htmlFor="resetInput">
+                    Phone Number or Email Address
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground">
                       <Mail className="h-4 w-4" />
                     </div>
                     <input
-                      id="resetEmail"
-                      type="email"
+                      id="resetInput"
+                      type="text"
                       required
-                      placeholder="name@example.com"
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="E.g., 9909108527 or name@example.com"
+                      value={resetInput}
+                      onChange={(e) => setResetInput(e.target.value)}
                       className="w-full pl-10 pr-4 py-2 sm:py-2.5 rounded-xl border border-border bg-muted/30 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-[16px] sm:text-sm transition-all"
                     />
                   </div>
                 </div>
+
+                {isLocalhost && (
+                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-[10px] text-amber-850 space-y-1">
+                    <p className="font-bold flex items-center gap-1"><ShieldAlert className="h-3.5 w-3.5 text-amber-600" /> Developer Notice (Localhost):</p>
+                    <p>Since default SMTP limits emails, you can also view or set the password directly in the Supabase Dashboard, or access the reset page directly: </p>
+                    <Link 
+                      href="/login/reset-password" 
+                      className="text-primary font-extrabold underline hover:text-primary/80"
+                    >
+                      Go to Reset Password Form
+                    </Link>
+                  </div>
+                )}
 
                 <button
                   type="submit"
@@ -417,29 +460,7 @@ export default function LoginPage() {
 
               </form>
 
-              <div className="mt-5 sm:mt-8 pt-4 sm:pt-6 border-t border-border/80">
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center mb-4">
-                  Quick Access (Click to fill)
-                </h2>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('admin')}
-                    className="py-2 sm:py-2.5 px-3 border border-primary/25 bg-accent/40 hover:bg-accent/80 text-primary rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer hover:border-primary/50"
-                  >
-                    <UserCheck className="h-3.5 w-3.5 text-primary" />
-                    Owner Admin
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('partner')}
-                    className="py-2 sm:py-2.5 px-3 border border-border bg-card hover:bg-muted/40 text-foreground/80 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                  >
-                    <UserCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                    Partner Staff
-                  </button>
-                </div>
-              </div>
+              {/* Quick fill options removed for security */}
             </div>
           )}
         </div>

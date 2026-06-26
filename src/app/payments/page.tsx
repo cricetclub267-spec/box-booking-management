@@ -56,9 +56,44 @@ export default function PaymentsPage() {
   const [showLogModal, setShowLogModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [logAmount, setLogAmount] = useState<string>('');
-  const [logMethod, setLogMethod] = useState<PaymentMethod>('UPI');
+  const [logPaymentMode, setLogPaymentMode] = useState<'UPI' | 'Cash' | 'Split'>('UPI');
+  const [logUpiSplit, setLogUpiSplit] = useState<string>('0');
+  const [logCashSplit, setLogCashSplit] = useState<string>('0');
   const [logError, setLogError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const handleLogUpiChange = (val: string) => {
+    const total = Number(logAmount) || 0;
+    const numVal = Number(val) || 0;
+    if (numVal > total) {
+      setLogUpiSplit(total.toString());
+      setLogCashSplit('0');
+    } else {
+      setLogUpiSplit(val);
+      setLogCashSplit((total - numVal).toString());
+    }
+  };
+
+  const handleLogCashChange = (val: string) => {
+    const total = Number(logAmount) || 0;
+    const numVal = Number(val) || 0;
+    if (numVal > total) {
+      setLogCashSplit(total.toString());
+      setLogUpiSplit('0');
+    } else {
+      setLogCashSplit(val);
+      setLogUpiSplit((total - numVal).toString());
+    }
+  };
+
+  const handleLogTotalChange = (val: string) => {
+    setLogAmount(val);
+    const total = Number(val) || 0;
+    if (logPaymentMode === 'Split') {
+      setLogUpiSplit(Math.round(total / 2).toString());
+      setLogCashSplit((total - Math.round(total / 2)).toString());
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -188,31 +223,67 @@ export default function PaymentsPage() {
       return;
     }
 
-    const amt = Number(logAmount);
-    if (!amt || amt <= 0) {
-      const errMsg = 'Please enter a valid payment amount greater than 0';
-      setLogError(errMsg);
-      showToast(errMsg, 'error');
-      return;
-    }
+    const summary = paymentSummaries[selectedBooking.id];
+    const outstanding = summary ? summary.pendingAmount : 0;
 
     setSubmitting(true);
     try {
-      const summary = paymentSummaries[selectedBooking.id];
-      const remaining = summary ? summary.pendingAmount : 0;
+      if (logPaymentMode === 'Split') {
+        const upiVal = Number(logUpiSplit) || 0;
+        const cashVal = Number(logCashSplit) || 0;
+        const total = upiVal + cashVal;
 
-      await addPayment({
-        booking_id: selectedBooking.id,
-        amount_paid: amt,
-        payment_method: logMethod,
-        payment_status: amt >= remaining ? 'Paid' : 'Partial'
-      }, user?.email);
+        if (total <= 0) {
+          throw new Error('Total payment amount must be greater than 0');
+        }
+        if (total > outstanding) {
+          throw new Error(`Total payment amount (₹${total}) exceeds outstanding balance (₹${outstanding})`);
+        }
+
+        // Add separate payments for UPI and Cash
+        if (upiVal > 0) {
+          await addPayment({
+            booking_id: selectedBooking.id,
+            amount_paid: upiVal,
+            payment_method: 'UPI',
+            payment_status: total >= outstanding ? 'Paid' : 'Partial'
+          }, user?.email);
+        }
+
+        if (cashVal > 0) {
+          await addPayment({
+            booking_id: selectedBooking.id,
+            amount_paid: cashVal,
+            payment_method: 'Cash',
+            payment_status: total >= outstanding ? 'Paid' : 'Partial'
+          }, user?.email);
+        }
+
+        showToast(`Logged split payment of ₹${total} (UPI: ₹${upiVal}, Cash: ₹${cashVal}) successfully!`, 'success');
+
+      } else {
+        const amt = Number(logAmount);
+        if (!amt || amt <= 0) {
+          throw new Error('Please enter a valid payment amount greater than 0');
+        }
+        if (amt > outstanding) {
+          throw new Error(`Payment amount (₹${amt}) exceeds outstanding balance (₹${outstanding})`);
+        }
+
+        await addPayment({
+          booking_id: selectedBooking.id,
+          amount_paid: amt,
+          payment_method: logPaymentMode,
+          payment_status: amt >= outstanding ? 'Paid' : 'Partial'
+        }, user?.email);
+
+        showToast(`Logged payment of ₹${amt} via ${logPaymentMode} successfully!`, 'success');
+      }
 
       setShowLogModal(false);
       setLogAmount('');
       setSelectedBooking(null);
       await loadData();
-      showToast(`Logged payment of ₹${amt} successfully!`, 'success');
     } catch (err: any) {
       const errMsg = err.message || 'Failed to record payment';
       setLogError(errMsg);
@@ -411,7 +482,11 @@ export default function PaymentsPage() {
                                 <button
                                   onClick={() => {
                                     setSelectedBooking(b);
-                                    setLogAmount(summary.pendingAmount.toString());
+                                    const pending = summary ? summary.pendingAmount : 0;
+                                    setLogAmount(pending.toString());
+                                    setLogPaymentMode('UPI');
+                                    setLogUpiSplit(pending.toString());
+                                    setLogCashSplit('0');
                                     setLogError(null);
                                     setShowLogModal(true);
                                   }}
@@ -529,32 +604,90 @@ export default function PaymentsPage() {
                   </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Amount Received (₹)</label>
-                  <input
-                    type="number"
-                    min={0.01}
-                    step="any"
-                    value={logAmount}
-                    onChange={(e) => setLogAmount(e.target.value)}
-                    onWheel={(e) => e.currentTarget.blur()}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted/20 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs transition-all font-bold"
-                  />
+                {/* Payment Mode Selector */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Payment Mode</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {(['UPI', 'Cash', 'Split'] as const).map(mode => {
+                      const isSelected = logPaymentMode === mode;
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => {
+                            setLogPaymentMode(mode);
+                            setLogError(null);
+                            const total = Number(paymentSummaries[selectedBooking.id]?.pendingAmount || 0);
+                            if (mode === 'Split') {
+                              setLogUpiSplit(Math.round(total / 2).toString());
+                              setLogCashSplit((total - Math.round(total / 2)).toString());
+                              setLogAmount(total.toString());
+                            } else {
+                              setLogAmount(total.toString());
+                            }
+                          }}
+                          className={`py-2.5 px-1 rounded-xl text-xs font-bold cursor-pointer transition-all text-center ${
+                            isSelected
+                              ? 'bg-primary text-white border-primary shadow-sm shadow-primary/10 font-black'
+                              : 'bg-card border-border hover:bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {mode}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Payment Mode</label>
-                  <select
-                    value={logMethod}
-                    onChange={(e) => setLogMethod(e.target.value as PaymentMethod)}
-                    className="w-full px-3.5 py-2.5 bg-muted/20 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer"
-                  >
-                    <option value="UPI">UPI</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Card">Card</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
-                  </select>
-                </div>
+                {/* Conditional inputs */}
+                {logPaymentMode === 'Split' ? (
+                  <div className="grid grid-cols-2 gap-4 bg-muted/20 rounded-xl p-4 border border-border/50">
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">UPI Amount (₹)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={logUpiSplit}
+                        onChange={(e) => handleLogUpiChange(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
+                        className="w-full px-3 py-2 bg-card border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cash Amount (₹)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={logCashSplit}
+                        onChange={(e) => handleLogCashChange(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
+                        className="w-full px-3 py-2 bg-card border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none"
+                      />
+                    </div>
+                    <div className="col-span-2 text-[10px] font-bold text-muted-foreground text-center pt-1 border-t border-border/40">
+                      Total Collected: <strong className="text-primary font-black">₹{logAmount}</strong>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="space-y-1.5 text-left">
+                      <label className="text-xs font-semibold text-muted-foreground">Amount Received (₹)</label>
+                      <input
+                        type="number"
+                        min={0.01}
+                        step="any"
+                        value={logAmount}
+                        onChange={(e) => handleLogTotalChange(e.target.value)}
+                        onWheel={(e) => e.currentTarget.blur()}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-muted/20 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs transition-all font-bold"
+                      />
+                    </div>
+
+                    <div className="bg-muted/10 p-3 border border-border/40 rounded-xl text-xs font-semibold text-muted-foreground text-center">
+                      Payment of <strong className="text-primary font-black">₹{logAmount}</strong> will be logged via <strong className="uppercase">{logPaymentMode}</strong>.
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-3 pt-4">
                   <button

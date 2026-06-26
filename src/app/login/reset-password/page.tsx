@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
 import { Key, ShieldAlert, Check } from 'lucide-react';
 import { supabase, hasSupabaseCredentials } from '@/lib/db/supabase';
+import Link from 'next/link';
 
 const resetSchema = zod.object({
   password: zod.string().min(6, 'Password must be at least 6 characters'),
@@ -63,7 +64,11 @@ export default function ResetPasswordPage() {
         }, 2000);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'An error occurred while resetting password');
+      let msg = err.message || 'An error occurred while resetting password';
+      if (msg.includes('Auth session missing') || msg.includes('session')) {
+        msg = 'Session missing: To reset the password, you must click the link in the recovery email sent to you, or update it directly in the Supabase Dashboard (Authentication -> Users).';
+      }
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }
@@ -102,7 +107,17 @@ export default function ResetPasswordPage() {
           {errorMsg && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-800 text-sm">
               <ShieldAlert className="h-5 w-5 shrink-0 text-red-600 mt-0.5" />
-              <span>{errorMsg}</span>
+              <div className="space-y-2">
+                <span>{errorMsg}</span>
+                {errorMsg.includes('Session missing') && (
+                  <Link 
+                    href="/login" 
+                    className="block font-bold text-primary underline text-xs mt-1"
+                  >
+                    Back to Login Page
+                  </Link>
+                )}
+              </div>
             </div>
           )}
 
