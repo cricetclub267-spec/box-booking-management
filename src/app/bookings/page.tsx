@@ -27,6 +27,7 @@ import { useAuthStore } from '@/lib/store/auth-store';
 import { useToastStore } from '@/lib/store/toast-store';
 import { sanitizeInput, checkRateLimit } from '@/lib/security';
 import { motion, AnimatePresence } from 'framer-motion';
+import { hasSupabaseCredentials, supabase } from '@/lib/db/supabase';
 
 import { 
   Plus, 
@@ -526,6 +527,56 @@ function BookingsContent() {
 
   useEffect(() => {
     loadAllData();
+
+    // 1. Tab visibility/focus listener
+    const handleFocus = () => {
+      loadAllData();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    // 2. Realtime listener (if Supabase is active)
+    let channel: any = null;
+    if (hasSupabaseCredentials() && supabase) {
+      channel = supabase
+        .channel('bookings-realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'bookings' },
+          () => {
+            loadAllData();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'payments' },
+          () => {
+            loadAllData();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'customers' },
+          () => {
+            loadAllData();
+          }
+        )
+        .subscribe();
+    }
+
+    // 3. Fallback polling (every 10 seconds)
+    const interval = setInterval(() => {
+      loadAllData();
+    }, 10000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      clearInterval(interval);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   // Handle auto-opening of booking via URL params

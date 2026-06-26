@@ -13,6 +13,7 @@ import { Booking, Payment, PaymentMethod, PaymentStatus } from '@/lib/db/types';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useToastStore } from '@/lib/store/toast-store';
 import { sanitizeInput, checkRateLimit } from '@/lib/security';
+import { hasSupabaseCredentials, supabase } from '@/lib/db/supabase';
 
 import { 
   IndianRupee, 
@@ -81,6 +82,56 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     loadData();
+
+    // 1. Tab visibility/focus listener
+    const handleFocus = () => {
+      loadData();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    // 2. Realtime listener (if Supabase is active)
+    let channel: any = null;
+    if (hasSupabaseCredentials() && supabase) {
+      channel = supabase
+        .channel('payments-realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'bookings' },
+          () => {
+            loadData();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'payments' },
+          () => {
+            loadData();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'customers' },
+          () => {
+            loadData();
+          }
+        )
+        .subscribe();
+    }
+
+    // 3. Fallback polling (every 10 seconds)
+    const interval = setInterval(() => {
+      loadData();
+    }, 10000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      clearInterval(interval);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   // Totals calculations based on active (non-cancelled) bookings

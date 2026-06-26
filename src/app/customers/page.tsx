@@ -24,6 +24,7 @@ import {
   X
 } from 'lucide-react';
 import Link from 'next/link';
+import { hasSupabaseCredentials, supabase } from '@/lib/db/supabase';
 
 interface CustomerWithStats extends Customer {
   totalBookings: number;
@@ -78,6 +79,56 @@ export default function CustomersPage() {
 
   useEffect(() => {
     loadData();
+
+    // 1. Tab visibility/focus listener
+    const handleFocus = () => {
+      loadData();
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    // 2. Realtime listener (if Supabase is active)
+    let channel: any = null;
+    if (hasSupabaseCredentials() && supabase) {
+      channel = supabase
+        .channel('customers-realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'bookings' },
+          () => {
+            loadData();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'payments' },
+          () => {
+            loadData();
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'customers' },
+          () => {
+            loadData();
+          }
+        )
+        .subscribe();
+    }
+
+    // 3. Fallback polling (every 10 seconds)
+    const interval = setInterval(() => {
+      loadData();
+    }, 10000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      clearInterval(interval);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   // Handle Query Search from global search bar
