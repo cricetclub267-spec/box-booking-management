@@ -79,3 +79,63 @@ export const resetRateLimit = (key: string): void => {
     localStorage.removeItem(`rate_limit_${key}`);
   }
 };
+
+// Helper to extract and format clean error messages from error objects (especially from Supabase/Fetch errors)
+export const getErrorMessage = (err: any, fallbackMessage: string = 'An unexpected error occurred'): string => {
+  if (!err) return fallbackMessage;
+  
+  if (typeof err === 'string') {
+    const trimmed = err.trim();
+    if (trimmed === '{}' || trimmed === '') {
+      return fallbackMessage;
+    }
+    return err;
+  }
+  
+  let msg = err.message;
+  
+  // Check if error contains nested error object or response details
+  if (!msg && err.error_description) {
+    msg = err.error_description;
+  }
+  
+  if (typeof msg === 'string') {
+    const trimmed = msg.trim();
+    if (trimmed === '{}' || trimmed === '' || trimmed.toLowerCase() === '[object object]') {
+      // If the error message is literally '{}' or '[object Object]', try to evaluate status code or fallback
+      if (err.status === 429) {
+        return 'Too many requests. Please try again in a few minutes.';
+      }
+      if (err.status === 504 || err.status === 500) {
+        return `${fallbackMessage} (Server or network timeout). Please try again later.`;
+      }
+      return fallbackMessage;
+    }
+    return msg;
+  }
+  
+  if (typeof msg === 'object' && msg !== null) {
+    try {
+      const stringified = JSON.stringify(msg);
+      if (stringified === '{}') {
+        return fallbackMessage;
+      }
+      return stringified;
+    } catch (e) {
+      return fallbackMessage;
+    }
+  }
+
+  // Handle case where error itself is a response-like object
+  if (err.status) {
+    if (err.status === 429) {
+      return 'Too many requests. Please try again in a few minutes.';
+    }
+    if (err.status === 504 || err.status === 500) {
+      return `${fallbackMessage} (Server or network timeout). Please try again later.`;
+    }
+  }
+  
+  return fallbackMessage;
+};
+

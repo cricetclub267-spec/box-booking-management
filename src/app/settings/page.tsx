@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/dashboard-layout';
+import { getErrorMessage } from '@/lib/security';
 import { getGrounds, logActivity, getPartners, createUserProfile, getUserProfileByPhone, updateGroundsRate } from '@/lib/db/db-service';
 import { Ground, User } from '@/lib/db/types';
 import { useAuthStore } from '@/lib/store/auth-store';
@@ -267,7 +268,7 @@ export default function SettingsPage() {
       const p = await getPartners();
       setPartners(p);
     } catch (err: any) {
-      setPartnerError(err.message || 'Failed to register partner account');
+      setPartnerError(getErrorMessage(err, 'Failed to register partner account'));
     } finally {
       setPartnerAdding(false);
     }

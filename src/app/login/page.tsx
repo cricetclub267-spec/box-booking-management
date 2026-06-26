@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useToastStore } from '@/lib/store/toast-store';
-import { sanitizeInput, checkRateLimit, resetRateLimit } from '@/lib/security';
+import { sanitizeInput, checkRateLimit, resetRateLimit, getErrorMessage } from '@/lib/security';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
@@ -207,7 +207,7 @@ export default function LoginPage() {
         }
       }
     } catch (err: any) {
-      const errMsg = err.message || 'An error occurred during sign in';
+      const errMsg = getErrorMessage(err, 'An error occurred during sign in');
       setErrorMsg(errMsg);
       showToast(errMsg, 'error');
     } finally {
@@ -259,7 +259,7 @@ export default function LoginPage() {
         setResetSuccess(`Mock Mode: Reset link generated for ${email}! Redirect target: /login/reset-password`);
       }
     } catch (err: any) {
-      setResetError(err.message || 'Failed to request password reset');
+      setResetError(getErrorMessage(err, 'Failed to request password reset'));
     } finally {
       setResetLoading(false);
     }

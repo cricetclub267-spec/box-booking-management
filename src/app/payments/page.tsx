@@ -12,7 +12,7 @@ import {
 import { Booking, Payment, PaymentMethod, PaymentStatus } from '@/lib/db/types';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useToastStore } from '@/lib/store/toast-store';
-import { sanitizeInput, checkRateLimit } from '@/lib/security';
+import { sanitizeInput, checkRateLimit, getErrorMessage } from '@/lib/security';
 import { hasSupabaseCredentials, supabase } from '@/lib/db/supabase';
 import { exportBookingReceiptPDF } from '@/lib/pdf-generator';
 
@@ -287,7 +287,7 @@ export default function PaymentsPage() {
       setSelectedBooking(null);
       await loadData();
     } catch (err: any) {
-      const errMsg = err.message || 'Failed to record payment';
+      const errMsg = getErrorMessage(err, 'Failed to record payment');
       setLogError(errMsg);
       showToast(errMsg, 'error');
     } finally {

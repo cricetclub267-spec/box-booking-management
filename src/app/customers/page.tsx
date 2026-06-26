@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { hasSupabaseCredentials, supabase } from '@/lib/db/supabase';
+import { getErrorMessage } from '@/lib/security';
 
 interface CustomerWithStats extends Customer {
   totalBookings: number;
@@ -171,7 +172,7 @@ export default function CustomersPage() {
       setShowAddModal(false);
       await loadData();
     } catch (err: any) {
-      setFormError(err.message || 'Failed to create customer');
+      setFormError(getErrorMessage(err, 'Failed to create customer'));
     } finally {
       setSubmitting(false);
     }

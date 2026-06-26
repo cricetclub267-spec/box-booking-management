@@ -8,6 +8,7 @@ import * as zod from 'zod';
 import { Key, ShieldAlert, Check } from 'lucide-react';
 import { supabase, hasSupabaseCredentials } from '@/lib/db/supabase';
 import Link from 'next/link';
+import { getErrorMessage } from '@/lib/security';
 
 const resetSchema = zod.object({
   password: zod.string().min(6, 'Password must be at least 6 characters'),
@@ -64,7 +65,7 @@ export default function ResetPasswordPage() {
         }, 2000);
       }
     } catch (err: any) {
-      let msg = err.message || 'An error occurred while resetting password';
+      let msg = getErrorMessage(err, 'An error occurred while resetting password');
       if (msg.includes('Auth session missing') || msg.includes('session')) {
         msg = 'Session missing: To reset the password, you must click the link in the recovery email sent to you, or update it directly in the Supabase Dashboard (Authentication -> Users).';
       }
