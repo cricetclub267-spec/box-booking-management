@@ -17,7 +17,8 @@ INSERT INTO auth.users (
   updated_at,
   role,
   phone
-) VALUES (
+) 
+SELECT
   '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1',
   '00000000-0000-0000-0000-000000000000',
   'partner1@gmail.com',
@@ -29,7 +30,9 @@ INSERT INTO auth.users (
   now(),
   'authenticated',
   '9328021142'
-) ON CONFLICT (id) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM auth.users WHERE email = 'partner1@gmail.com' OR phone = '9328021142' OR id = '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1'
+);
 
 INSERT INTO public.users (
   id,
@@ -37,13 +40,16 @@ INSERT INTO public.users (
   phone,
   role,
   created_at
-) VALUES (
+) 
+SELECT
   '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1',
   'partner1@gmail.com',
   '9328021142',
   'partner',
   now()
-) ON CONFLICT (id) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.users WHERE email = 'partner1@gmail.com' OR phone = '9328021142' OR id = '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1'
+);
 
 
 -- 2. Insert Partner 2 (partner2@gmail.com, 9426481232)
@@ -59,7 +65,8 @@ INSERT INTO auth.users (
   updated_at,
   role,
   phone
-) VALUES (
+) 
+SELECT
   'ad9e5590-db0e-4001-8bf7-df427e1f6e2a',
   '00000000-0000-0000-0000-000000000000',
   'partner2@gmail.com',
@@ -71,7 +78,9 @@ INSERT INTO auth.users (
   now(),
   'authenticated',
   '9426481232'
-) ON CONFLICT (id) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM auth.users WHERE email = 'partner2@gmail.com' OR phone = '9426481232' OR id = 'ad9e5590-db0e-4001-8bf7-df427e1f6e2a'
+);
 
 INSERT INTO public.users (
   id,
@@ -79,13 +88,16 @@ INSERT INTO public.users (
   phone,
   role,
   created_at
-) VALUES (
+) 
+SELECT
   'ad9e5590-db0e-4001-8bf7-df427e1f6e2a',
   'partner2@gmail.com',
   '9426481232',
   'partner',
   now()
-) ON CONFLICT (id) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.users WHERE email = 'partner2@gmail.com' OR phone = '9426481232' OR id = 'ad9e5590-db0e-4001-8bf7-df427e1f6e2a'
+);
 
 
 -- 3. Insert Partner 3 (partner3@gmail.com, 9499745268)
@@ -101,7 +113,8 @@ INSERT INTO auth.users (
   updated_at,
   role,
   phone
-) VALUES (
+) 
+SELECT
   'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a',
   '00000000-0000-0000-0000-000000000000',
   'partner3@gmail.com',
@@ -113,7 +126,9 @@ INSERT INTO auth.users (
   now(),
   'authenticated',
   '9499745268'
-) ON CONFLICT (id) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM auth.users WHERE email = 'partner3@gmail.com' OR phone = '9499745268' OR id = 'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a'
+);
 
 INSERT INTO public.users (
   id,
@@ -121,10 +136,13 @@ INSERT INTO public.users (
   phone,
   role,
   created_at
-) VALUES (
+) 
+SELECT
   'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a',
   'partner3@gmail.com',
   '9499745268',
   'partner',
   now()
-) ON CONFLICT (id) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.users WHERE email = 'partner3@gmail.com' OR phone = '9499745268' OR id = 'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a'
+);
