@@ -15,7 +15,7 @@ let memUsers: User[] = [];
 // Default Grounds
 const DEFAULT_GROUNDS: Ground[] = [
   { id: 'g1', name: 'Box 1 (Premium Turf)', hourly_rate: 1200, created_at: new Date().toISOString() },
-  { id: 'g2', name: 'Box 2 (Standard Turf)', hourly_rate: 1000, created_at: new Date().toISOString() }
+  { id: 'g2', name: 'Box 2 (Premium Turf)', hourly_rate: 1200, created_at: new Date().toISOString() }
 ];
 
 // Default admin user fallback credentials
@@ -52,18 +52,18 @@ const initializeSeedData = () => {
       localStorage.setItem('turf_users', JSON.stringify([DEFAULT_ADMIN]));
     }
     
-    // Migration: Update existing grounds with old names
+    // Migration: Update existing grounds with old names/prices
     try {
       const parsed: Ground[] = JSON.parse(storedGrounds);
       let updated = false;
       const newParsed = parsed.map(g => {
-        if (g.id === 'g1' && g.name.includes('Ground A')) {
+        if (g.id === 'g1' && (g.name.includes('Ground A') || g.hourly_rate !== 1200)) {
           updated = true;
-          return { ...g, name: 'Box 1 (Premium Turf)' };
+          return { ...g, name: 'Box 1 (Premium Turf)', hourly_rate: 1200 };
         }
-        if (g.id === 'g2' && g.name.includes('Ground B')) {
+        if (g.id === 'g2' && (g.name.includes('Ground B') || g.name.includes('Standard Turf') || g.hourly_rate !== 1200)) {
           updated = true;
-          return { ...g, name: 'Box 2 (Standard Turf)' };
+          return { ...g, name: 'Box 2 (Premium Turf)', hourly_rate: 1200 };
         }
         return g;
       });

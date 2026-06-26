@@ -53,7 +53,7 @@ export const getGrounds = async (): Promise<Ground[]> => {
           console.log('Grounds table is empty. Seeding default grounds...');
           const defaultGrounds = [
             { name: 'Box 1 (Premium Turf)', hourly_rate: 1200.00 },
-            { name: 'Box 2 (Standard Turf)', hourly_rate: 1000.00 }
+            { name: 'Box 2 (Premium Turf)', hourly_rate: 1200.00 }
           ];
           const { data: insertedData, error: insertError } = await supabase
             .from('grounds')
@@ -73,6 +73,46 @@ export const getGrounds = async (): Promise<Ground[]> => {
       
       // Fallback to mock grounds if we couldn't seed, preventing an empty scheduler/selector
       return mockDb.getGrounds();
+    }
+    
+    // Auto-migrate database grounds names/prices if needed
+    if (data && data.length > 0) {
+      const updatedData = [...data];
+      for (let i = 0; i < updatedData.length; i++) {
+        const g = updatedData[i];
+        let newName = g.name;
+        let newRate = Number(g.hourly_rate);
+        let changed = false;
+
+        if (g.name.includes('Standard Turf') || g.name.includes('Ground B')) {
+          newName = 'Box 2 (Premium Turf)';
+          newRate = 1200.00;
+          changed = true;
+        } else if (g.name.includes('Ground A')) {
+          newName = 'Box 1 (Premium Turf)';
+          newRate = 1200.00;
+          changed = true;
+        } else if (g.name === 'Box 1 (Premium Turf)' && Number(g.hourly_rate) !== 1200) {
+          newRate = 1200.00;
+          changed = true;
+        } else if (g.name === 'Box 2 (Premium Turf)' && Number(g.hourly_rate) !== 1200) {
+          newRate = 1200.00;
+          changed = true;
+        }
+
+        if (changed) {
+          try {
+            await supabase
+              .from('grounds')
+              .update({ name: newName, hourly_rate: newRate })
+              .eq('id', g.id);
+            updatedData[i] = { ...g, name: newName, hourly_rate: newRate };
+          } catch (updateErr) {
+            console.error(`Failed to migrate Ground ${g.id} in Supabase:`, updateErr);
+          }
+        }
+      }
+      return updatedData;
     }
     
     return data && data.length > 0 ? data : mockDb.getGrounds();
@@ -214,7 +254,7 @@ export const updateBooking = async (
   updatedBooking: Booking,
   userEmail: string = 'dhameliyaavadh592@gmail.com'
 ): Promise<Booking> => {
-  if (useSupabase() && supabase) {
+  if (useSupabase() && supabase && !updatedBooking.id.startsWith('book_')) {
     // 1. Conflict Check
     const { data: conflicts, error: conflictError } = await supabase
       .from('bookings')
@@ -259,7 +299,7 @@ export const softDeleteBooking = async (
   bookingId: string,
   userEmail: string = 'dhameliyaavadh592@gmail.com'
 ): Promise<void> => {
-  if (useSupabase() && supabase) {
+  if (useSupabase() && supabase && !bookingId.startsWith('book_')) {
     const { error } = await supabase
       .from('bookings')
       .update({ deleted_at: new Date().toISOString(), status: 'Cancelled' })
@@ -296,7 +336,7 @@ export const getPayments = async (): Promise<Payment[]> => {
 };
 
 export const getBookingPaymentSummary = async (bookingId: string) => {
-  if (useSupabase() && supabase) {
+  if (useSupabase() && supabase && !bookingId.startsWith('book_')) {
     const { data: payments, error } = await supabase
       .from('payments')
       .select('amount_paid')
@@ -341,7 +381,7 @@ export const addPayment = async (
   paymentData: Omit<Payment, 'id' | 'payment_date'>,
   userEmail: string = 'dhameliyaavadh592@gmail.com'
 ): Promise<Payment> => {
-  if (useSupabase() && supabase) {
+  if (useSupabase() && supabase && !paymentData.booking_id.startsWith('book_')) {
     const summary = await getBookingPaymentSummary(paymentData.booking_id);
     const newPending = summary.pendingAmount - paymentData.amount_paid;
     if (newPending < -0.01) {
@@ -496,4 +536,25 @@ export const getBookingStatus = (booking: Booking): 'Booked' | 'Running' | 'Comp
     return 'Completed';
   }
 };
+
+export const updateGroundsRate = async (rate: number): Promise<void> => {
+  if (useSupabase() && supabase) {
+    try {
+      const grounds = await getGrounds();
+      for (const g of grounds) {
+        const { error } = await supabase
+          .from('grounds')
+          .update({ hourly_rate: rate })
+          .eq('id', g.id);
+        if (error) {
+          handleDbError(error);
+          console.error('Supabase updateGroundsRate error for ground', g.id, error);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to update grounds in Supabase:', e);
+    }
+  }
+};
+
 

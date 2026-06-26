@@ -188,12 +188,14 @@ function BookingsContent() {
         const stored = localStorage.getItem('turf_slot_pricing');
         if (stored) {
           const customRates = JSON.parse(stored);
-          if (customRates && customRates[groundId]) {
-            const rules = customRates[groundId];
-            if (isWeekend) {
-              return isDaytime ? (Number(rules.weekend_daytime) || 700) : (Number(rules.weekend_nighttime) || 1200);
-            } else {
-              return isDaytime ? (Number(rules.weekday_daytime) || 600) : (Number(rules.weekday_nighttime) || 1000);
+          if (customRates) {
+            const rules = customRates[groundId] || Object.values(customRates)[0];
+            if (rules) {
+              if (isWeekend) {
+                return isDaytime ? (Number(rules.weekend_daytime) || 700) : (Number(rules.weekend_nighttime) || 1200);
+              } else {
+                return isDaytime ? (Number(rules.weekday_daytime) || 600) : (Number(rules.weekday_nighttime) || 1000);
+              }
             }
           }
         }
@@ -204,14 +206,8 @@ function BookingsContent() {
     
     // Fallbacks
     if (isWeekend) {
-      if (groundId === 'g2') {
-        return isDaytime ? 600 : 1000;
-      }
       return isDaytime ? 700 : 1200;
     } else {
-      if (groundId === 'g2') {
-        return isDaytime ? 500 : 800;
-      }
       return isDaytime ? 600 : 1000;
     }
   };
@@ -1775,7 +1771,7 @@ function BookingsContent() {
                       <div className="grid grid-cols-2 gap-4">
                         {grounds.map((g, idx) => {
                           const isSelected = formGroundId === g.id;
-                          const boxName = idx === 0 ? 'Box 1 (Premium Turf)' : 'Box 2 (Standard Turf)';
+                          const boxName = idx === 0 ? 'Box 1 (Premium Turf)' : 'Box 2 (Premium Turf)';
                           return (
                             <button
                               key={g.id}
@@ -1871,7 +1867,7 @@ function BookingsContent() {
                     <div className="bg-[#0c4a28]/10 border border-[#0c4a28]/20 rounded-2xl p-4 flex justify-between items-center text-xs">
                       <div>
                         <span className="text-[10px] font-bold text-muted-foreground uppercase block">Selected Turf</span>
-                        <span className="font-extrabold text-foreground">{formGroundId === grounds[0]?.id ? 'Box 1 (Premium Turf)' : 'Box 2 (Standard Turf)'}</span>
+                        <span className="font-extrabold text-foreground">{formGroundId === grounds[0]?.id ? 'Box 1 (Premium Turf)' : 'Box 2 (Premium Turf)'}</span>
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] font-bold text-muted-foreground uppercase block">Selected Date</span>
@@ -2011,7 +2007,7 @@ function BookingsContent() {
                       </div>
                       <div className="space-y-0.5">
                         <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Turf Box / Ground</span>
-                        <span className="text-xs font-bold text-foreground block">{formGroundId === grounds[0]?.id ? 'Box 1 (Premium Turf)' : 'Box 2 (Standard Turf)'}</span>
+                        <span className="text-xs font-bold text-foreground block">{formGroundId === grounds[0]?.id ? 'Box 1 (Premium Turf)' : 'Box 2 (Premium Turf)'}</span>
                       </div>
                       <div className="space-y-0.5">
                         <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Booking Date</span>
