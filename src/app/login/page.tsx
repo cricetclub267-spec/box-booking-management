@@ -10,7 +10,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
 import { LogIn, Key, Mail, ShieldAlert, UserCheck, Phone, ArrowLeft } from 'lucide-react';
-import { logActivity, getUserProfileByPhone, createUserProfile } from '@/lib/db/db-service';
+import { logActivity, getUserProfileByPhone, createUserProfile, getUserProfileByEmail } from '@/lib/db/db-service';
 import { supabase, hasSupabaseCredentials } from '@/lib/db/supabase';
 
 const loginSchema = zod.object({
@@ -223,24 +223,20 @@ export default function LoginPage() {
     setResetError(null);
 
     try {
-      const input = resetInput.trim();
-      if (!input) {
-        throw new Error('Please enter your registered phone number or email address');
+      const email = resetInput.trim().toLowerCase();
+      if (!email) {
+        throw new Error('Please enter your registered email address');
       }
 
-      let email = '';
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new Error('Please enter a valid email address');
+      }
 
-      if (input.match(/^\d{10}$/)) {
-        // Search user profile by phone
-        const profile = await getUserProfileByPhone(input);
-        if (!profile) {
-          throw new Error('No account found with this phone number');
-        }
-        email = profile.email;
-      } else if (input.includes('@')) {
-        email = input;
-      } else {
-        throw new Error('Please enter a valid 10-digit phone number or email address');
+      // Check if user profile exists and has admin or partner role
+      const profile = await getUserProfileByEmail(email);
+      if (!profile || (profile.role !== 'admin' && profile.role !== 'partner')) {
+        throw new Error('User does not exist');
       }
 
       if (hasSupabaseCredentials() && supabase) {
@@ -301,7 +297,7 @@ export default function LoginPage() {
             <div className="space-y-4 sm:space-y-5 animate-fade-in">
               <div>
                 <h2 className="text-lg font-bold text-foreground">Forgot Password</h2>
-                <p className="text-xs text-muted-foreground mt-1">Enter your registered mobile number or email address to receive a recovery link.</p>
+                <p className="text-xs text-muted-foreground mt-1">Enter your registered email address to receive a recovery link.</p>
               </div>
 
               {resetSuccess && (
@@ -320,7 +316,7 @@ export default function LoginPage() {
               <form onSubmit={handleForgotPassword} className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-foreground/80 block" htmlFor="resetInput">
-                    Phone Number or Email Address
+                    Email Address
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted-foreground">
@@ -328,9 +324,9 @@ export default function LoginPage() {
                     </div>
                     <input
                       id="resetInput"
-                      type="text"
+                      type="email"
                       required
-                      placeholder="E.g., 9909108527 or name@example.com"
+                      placeholder="name@example.com"
                       value={resetInput}
                       onChange={(e) => setResetInput(e.target.value)}
                       className="w-full pl-10 pr-4 py-2 sm:py-2.5 rounded-xl border border-border bg-muted/30 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-[16px] sm:text-sm transition-all"

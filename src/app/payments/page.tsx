@@ -14,6 +14,7 @@ import { useAuthStore } from '@/lib/store/auth-store';
 import { useToastStore } from '@/lib/store/toast-store';
 import { sanitizeInput, checkRateLimit } from '@/lib/security';
 import { hasSupabaseCredentials, supabase } from '@/lib/db/supabase';
+import { exportBookingReceiptPDF } from '@/lib/pdf-generator';
 
 import { 
   IndianRupee, 
@@ -28,7 +29,8 @@ import {
   AlertCircle,
   FileSpreadsheet,
   Receipt,
-  ChevronDown
+  ChevronDown,
+  Download
 } from 'lucide-react';
 import { 
   DropdownMenu, 
@@ -447,7 +449,7 @@ export default function PaymentsPage() {
                       <th className="py-3 px-5">Amount Paid</th>
                       <th className="py-3 px-5">Pending Amount</th>
                       <th className="py-3 px-5">Payment Status</th>
-                      {user?.role === 'admin' && <th className="py-3 px-5 text-right">Actions</th>}
+                      <th className="py-3 px-5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60 text-xs text-foreground font-medium">
@@ -476,31 +478,43 @@ export default function PaymentsPage() {
                               {summary?.status || 'Pending'}
                             </span>
                           </td>
-                          {user?.role === 'admin' && (
-                            <td className="py-3.5 px-5 text-right">
-                              {summary && summary.pendingAmount > 0 ? (
-                                <button
-                                  onClick={() => {
-                                    setSelectedBooking(b);
-                                    const pending = summary ? summary.pendingAmount : 0;
-                                    setLogAmount(pending.toString());
-                                    setLogPaymentMode('UPI');
-                                    setLogUpiSplit(pending.toString());
-                                    setLogCashSplit('0');
-                                    setLogError(null);
-                                    setShowLogModal(true);
-                                  }}
-                                  className="py-1 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-all active:scale-95"
-                                >
-                                  Collect
-                                </button>
-                              ) : (
+                          <td className="py-3.5 px-5 text-right flex items-center justify-end gap-2">
+                            {user?.role === 'admin' && summary && summary.pendingAmount > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedBooking(b);
+                                  const pending = summary ? summary.pendingAmount : 0;
+                                  setLogAmount(pending.toString());
+                                  setLogPaymentMode('UPI');
+                                  setLogUpiSplit(pending.toString());
+                                  setLogCashSplit('0');
+                                  setLogError(null);
+                                  setShowLogModal(true);
+                                }}
+                                className="py-1 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-all active:scale-95"
+                              >
+                                Collect
+                              </button>
+                            ) : (
+                              summary && summary.pendingAmount === 0 && (
                                 <span className="text-[10px] text-emerald-700 font-bold flex items-center justify-end gap-1">
                                   <CheckCircle className="h-3.5 w-3.5" /> Settled
                                 </span>
-                              )}
-                            </td>
-                          )}
+                              )
+                            )}
+                            
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await exportBookingReceiptPDF(b, summary || { totalPaid: 0, pendingAmount: b.final_amount, status: 'Pending' });
+                              }}
+                              className="p-1.5 border border-border bg-card hover:bg-muted text-foreground/80 font-bold rounded-lg text-[10px] transition-all cursor-pointer inline-flex items-center justify-center"
+                              title="Download Receipt"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -534,6 +548,7 @@ export default function PaymentsPage() {
                       <th className="py-3 px-5">Collected On</th>
                       <th className="py-3 px-5">Payment Method</th>
                       <th className="py-3 px-5">Amount Collected</th>
+                      <th className="py-3 px-5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60 text-xs text-foreground font-medium">
@@ -561,6 +576,21 @@ export default function PaymentsPage() {
                             </span>
                           </td>
                           <td className="py-3.5 px-5 font-bold text-emerald-700">₹{Number(p.amount_paid).toLocaleString('en-IN')}</td>
+                          <td className="py-3.5 px-5 text-right">
+                            {b && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const summary = paymentSummaries[p.booking_id] || { totalPaid: Number(p.amount_paid), pendingAmount: 0, status: 'Paid' };
+                                  await exportBookingReceiptPDF(b, summary);
+                                }}
+                                className="p-1.5 border border-border bg-card hover:bg-muted text-foreground/80 font-bold rounded-lg text-[10px] transition-all cursor-pointer inline-flex items-center justify-center"
+                                title="Download Receipt"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}

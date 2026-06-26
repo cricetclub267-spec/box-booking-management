@@ -476,6 +476,24 @@ export const getUserProfileByPhone = async (phone: string): Promise<User | null>
   return mockUsers.find(u => u.phone === phone) || null;
 };
 
+export const getUserProfileByEmail = async (email: string): Promise<User | null> => {
+  if (useSupabase() && supabase) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
+      
+    if (error) {
+      handleDbError(error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+    return data;
+  }
+  const mockUsers = mockDb.getUsers();
+  return mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
+};
+
 export const createUserProfile = async (
   profile: Omit<User, 'created_at'>
 ): Promise<User> => {

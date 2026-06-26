@@ -28,6 +28,7 @@ import { useToastStore } from '@/lib/store/toast-store';
 import { sanitizeInput, checkRateLimit } from '@/lib/security';
 import { motion, AnimatePresence } from 'framer-motion';
 import { hasSupabaseCredentials, supabase } from '@/lib/db/supabase';
+import { exportBookingReceiptPDF } from '@/lib/pdf-generator';
 
 import { 
   Plus, 
@@ -48,7 +49,8 @@ import {
   IndianRupee,
   Activity,
   AlertCircle,
-  ChevronDown
+  ChevronDown,
+  Download
 } from 'lucide-react';
 import { 
   DropdownMenu, 
@@ -1680,12 +1682,24 @@ function BookingsContent() {
               </div>
 
               {/* Actions Footer */}
-              <div className="flex items-center gap-2 pt-4 border-t border-border/80 justify-between">
+              <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-border/80 justify-between items-stretch sm:items-center">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const summary = paymentSummaries[selectedBooking.id] || { totalPaid: 0, pendingAmount: selectedBooking.final_amount, status: 'Pending' };
+                    await exportBookingReceiptPDF(selectedBooking, summary);
+                  }}
+                  className="py-2.5 px-4 border border-[#0c4a28]/30 bg-card hover:bg-muted text-[#0c4a28] font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="h-4 w-4" /> Download Receipt
+                </button>
+
                 {user?.role === 'admin' ? (
-                  <div className="flex items-center gap-2 w-full">
+                  <div className="flex items-center gap-2 flex-1 sm:justify-end">
                     {/* Log Payment Trigger */}
                     {selectedBooking.id && (paymentSummaries[selectedBooking.id]?.pendingAmount || 0) > 0 && (
                       <button
+                        type="button"
                         onClick={() => {
                           const pending = paymentSummaries[selectedBooking.id]?.pendingAmount || 0;
                           setPaymentAmount(pending.toString());
@@ -1702,6 +1716,7 @@ function BookingsContent() {
                     )}
                     
                     <button
+                      type="button"
                       onClick={() => handleOpenEdit(selectedBooking)}
                       className="py-2.5 px-4 border border-border bg-card hover:bg-muted text-foreground/80 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
@@ -1709,14 +1724,15 @@ function BookingsContent() {
                     </button>
                     
                     <button
+                      type="button"
                       onClick={() => handleDeleteBooking(selectedBooking.id)}
-                      className="py-2.5 px-3 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 ml-auto cursor-pointer"
+                      className="py-2.5 px-3 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 ) : (
-                  <p className="text-[10px] text-muted-foreground italic w-full text-center">Staff Member: View Only Account</p>
+                  <p className="text-[10px] text-muted-foreground italic sm:ml-auto">Staff Member: View Only Account</p>
                 )}
               </div>
             </div>

@@ -1,5 +1,23 @@
 import type jsPDF from 'jspdf';
 import { Booking, Payment } from './db/types';
+import { supabase, hasSupabaseCredentials } from './db/supabase';
+import * as mockDb from './db/mock-db';
+
+const useSupabase = (): boolean => {
+  return hasSupabaseCredentials() && supabase !== null;
+};
+
+const formatPhone = (phone?: string): string => {
+  if (!phone) return 'N/A';
+  let cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    cleaned = cleaned.substring(1);
+  }
+  if (cleaned.length === 12 && cleaned.startsWith('91')) {
+    cleaned = cleaned.substring(2);
+  }
+  return cleaned;
+};
 
 // Helper to asynchronously load the brand logo image in the browser
 const loadLogoImage = (): Promise<HTMLImageElement> => {
@@ -100,6 +118,51 @@ export const exportBookingReceiptPDF = async (
   const logoImg = await loadLogoImage();
   addPDFHeader(doc, 'BOOKING INVOICE RECEIPT', logoImg);
 
+  // Load payments for this booking
+  let bookingPayments: Payment[] = [];
+  if (useSupabase() && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('booking_id', booking.id);
+      if (!error && data) {
+        bookingPayments = data;
+      }
+    } catch (e) {
+      console.error('Failed to load payments for PDF:', e);
+    }
+  } else {
+    bookingPayments = mockDb.getPayments().filter((p: any) => p.booking_id === booking.id);
+  }
+
+  // Calculate payment type breakdown
+  const cashPayments = bookingPayments.filter((p: any) => p.payment_method === 'Cash');
+  const upiPayments = bookingPayments.filter((p: any) => p.payment_method === 'UPI');
+  const cardPayments = bookingPayments.filter((p: any) => p.payment_method === 'Card');
+  const bankPayments = bookingPayments.filter((p: any) => p.payment_method === 'Bank Transfer');
+
+  const cashTotal = cashPayments.reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  const upiTotal = upiPayments.reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  const cardTotal = cardPayments.reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  const bankTotal = bankPayments.reduce((sum, p) => sum + Number(p.amount_paid), 0);
+
+  let paymentTypeStr = 'None';
+  if (bookingPayments.length > 0) {
+    const activeMethods = [];
+    if (cashTotal > 0) activeMethods.push(`Cash: ₹${cashTotal}`);
+    if (upiTotal > 0) activeMethods.push(`UPI: ₹${upiTotal}`);
+    if (cardTotal > 0) activeMethods.push(`Card: ₹${cardTotal}`);
+    if (bankTotal > 0) activeMethods.push(`Bank: ₹${bankTotal}`);
+
+    if (activeMethods.length > 1) {
+      paymentTypeStr = `Split (${activeMethods.join(', ')})`;
+    } else {
+      const singleMethod = bookingPayments[0].payment_method;
+      paymentTypeStr = `${singleMethod} (₹${paymentSummary.totalPaid})`;
+    }
+  }
+
   // Customer & Booking Metadata Info Box
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
@@ -109,7 +172,7 @@ export const exportBookingReceiptPDF = async (
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(50, 50, 50);
   doc.text(`Name: ${booking.customer?.name || 'Walk-in'}`, 14, 62);
-  doc.text(`Phone: ${booking.customer?.phone || 'N/A'}`, 14, 67);
+  doc.text(`Phone: ${formatPhone(booking.customer?.phone)}`, 14, 67);
 
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(12, 74, 40);
@@ -177,13 +240,18 @@ export const exportBookingReceiptPDF = async (
   doc.text('Net Final Bill:', 130, finalY + 10);
   doc.text(`₹${booking.final_amount}`, 180, finalY + 10, { align: 'right' });
 
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(80, 80, 80);
+  doc.text('Payment Type:', 130, finalY + 15);
+  doc.text(paymentTypeStr, 180, finalY + 15, { align: 'right' });
+
   doc.setTextColor(60, 60, 60);
-  doc.text('Total Collected:', 130, finalY + 15);
-  doc.text(`₹${paymentSummary.totalPaid}`, 180, finalY + 15, { align: 'right' });
+  doc.text('Total Collected:', 130, finalY + 20);
+  doc.text(`₹${paymentSummary.totalPaid}`, 180, finalY + 20, { align: 'right' });
 
   doc.setTextColor(180, 50, 50);
-  doc.text('Remaining Balance:', 130, finalY + 20);
-  doc.text(`₹${paymentSummary.pendingAmount}`, 180, finalY + 20, { align: 'right' });
+  doc.text('Remaining Balance:', 130, finalY + 25);
+  doc.text(`₹${paymentSummary.pendingAmount}`, 180, finalY + 25, { align: 'right' });
 
   addPDFFooter(doc);
   
@@ -252,7 +320,7 @@ export const exportRevenueReportPDF = async (
       : '₹0';
 
     return [
-      b.id,
+      b.id.substring(0, 8),
       new Date(b.booking_date).toLocaleDateString(),
       b.customer?.name || 'Walk-in',
       b.ground?.name.split(' ')[0] || 'Ground',
@@ -312,8 +380,8 @@ export const exportPaymentsReportPDF = async (
   const tableBody = paymentsList.map(p => {
     const booking = bookingsList.find(b => b.id === p.booking_id);
     return [
-      p.id,
-      p.booking_id,
+      p.id.substring(0, 8),
+      p.booking_id.substring(0, 8),
       booking?.customer?.name || 'Customer',
       new Date(p.payment_date).toLocaleDateString(),
       p.payment_method,
@@ -368,10 +436,10 @@ export const exportDiscountReportPDF = async (
   doc.text(`Total Discount Sum: ₹${totalDiscounts.toLocaleString('en-IN')}`, 14, 65);
 
   const tableBody = discountedBookings.map(b => [
-    b.id,
+    b.id.substring(0, 8),
     new Date(b.booking_date).toLocaleDateString(),
     b.customer?.name || 'Customer',
-    b.customer?.phone || 'N/A',
+    formatPhone(b.customer?.phone),
     `₹${b.amount}`,
     `₹${b.discount}`,
     b.notes || 'Regular Discount'

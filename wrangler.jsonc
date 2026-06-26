@@ -20,6 +20,10 @@
   "images": {
     "binding": "IMAGES"
   },
+  "vars": {
+    "NEXT_PUBLIC_SUPABASE_URL": "https://ukfalpslqonxoaadzupb.supabase.co",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrZmFscHNscW9ueG9hYWR6dXBiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyOTU5OTEsImV4cCI6MjA5Nzg3MTk5MX0.LaGy-JOQuiE8Xo99pctXeqY9weyoC6hUAuDGo1Zk7KM"
+  },
   "observability": {
     "enabled": true
   }
