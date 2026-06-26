@@ -38,6 +38,12 @@ export default function SettingsPage() {
   
   // Custom Grounds configuration (Edit prices)
   const [rates, setRates] = useState<Record<string, string>>({});
+  const [slotPricing, setSlotPricing] = useState<Record<string, {
+    weekday_daytime: string;
+    weekday_nighttime: string;
+    weekend_daytime: string;
+    weekend_nighttime: string;
+  }>>({});
   const [updating, setUpdating] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -64,6 +70,41 @@ export default function SettingsPage() {
           initialRates[item.id] = item.hourly_rate.toString();
         });
         setRates(initialRates);
+
+        // Load custom slot rates pricing
+        let initialSlotPricing: typeof slotPricing = {};
+        if (typeof window !== 'undefined') {
+          const storedSlotPricing = localStorage.getItem('turf_slot_pricing');
+          if (storedSlotPricing) {
+            try {
+              initialSlotPricing = JSON.parse(storedSlotPricing);
+            } catch (err) {
+              console.error('Failed to parse turf_slot_pricing', err);
+            }
+          }
+        }
+        
+        // Seed defaults if empty
+        g.forEach(item => {
+          if (!initialSlotPricing[item.id]) {
+            if (item.id === 'g2') {
+              initialSlotPricing[item.id] = {
+                weekday_daytime: '500',
+                weekday_nighttime: '800',
+                weekend_daytime: '600',
+                weekend_nighttime: '1000'
+              };
+            } else {
+              initialSlotPricing[item.id] = {
+                weekday_daytime: '600',
+                weekday_nighttime: '1000',
+                weekend_daytime: '700',
+                weekend_nighttime: '1200'
+              };
+            }
+          }
+        });
+        setSlotPricing(initialSlotPricing);
 
         // Retrieve facility name from localStorage if saved
         if (typeof window !== 'undefined') {
@@ -96,7 +137,7 @@ export default function SettingsPage() {
     setUpdating(true);
     setSuccessMsg(null);
 
-    // Mock update: Write updated ground rates to localstorage
+    // Mock update: Write updated ground rates and slot rates to localstorage
     setTimeout(async () => {
       try {
         if (typeof window !== 'undefined') {
@@ -110,6 +151,8 @@ export default function SettingsPage() {
             localStorage.setItem('turf_grounds', JSON.stringify(updated));
             setGrounds(updated);
           }
+          // Save slot pricing rules
+          localStorage.setItem('turf_slot_pricing', JSON.stringify(slotPricing));
           // Save facility info
           localStorage.setItem('turf_facility_name', businessName);
         }
@@ -265,28 +308,132 @@ export default function SettingsPage() {
                     <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {grounds.map(ground => (
-                      <div key={ground.id} className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center border-b border-border/40 pb-4 last:border-0 last:pb-0">
-                        <div>
-                          <p className="text-xs font-bold text-foreground">{ground.name}</p>
-                          <p className="text-[10px] text-muted-foreground">ID: {ground.id} • Registered</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="relative flex-1 sm:max-w-xs">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">₹</span>
-                            <input
-                              type="text"
-                              disabled={user?.role !== 'admin'}
-                              value={rates[ground.id] || ''}
-                              onChange={(e) => handleRateChange(ground.id, e.target.value)}
-                              className="w-full pl-7 pr-12 py-2 bg-muted/20 border border-border rounded-xl text-xs font-bold text-foreground focus:bg-card focus:outline-none"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground">/ hour</span>
+                  <div className="space-y-6">
+                    {grounds.map(ground => {
+                      const rules = slotPricing[ground.id] || {
+                        weekday_daytime: '600',
+                        weekday_nighttime: '1000',
+                        weekend_daytime: '700',
+                        weekend_nighttime: '1200'
+                      };
+                      return (
+                        <div key={ground.id} className="border-b border-border/40 pb-6 last:border-0 last:pb-0 space-y-4">
+                          <div>
+                            <h3 className="text-xs font-black text-foreground">{ground.name}</h3>
+                            <p className="text-[10px] text-muted-foreground">ID: {ground.id} • Configure customized slot pricing rules below</p>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5 items-end">
+                            {/* Base hourly rate (kept for compatibility) */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Base Hourly Rate</label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">₹</span>
+                                <input
+                                  type="text"
+                                  disabled={user?.role !== 'admin'}
+                                  value={rates[ground.id] || ''}
+                                  onChange={(e) => handleRateChange(ground.id, e.target.value)}
+                                  className="w-full pl-7 pr-3 py-2 bg-muted/20 border border-border rounded-xl text-xs font-bold text-foreground focus:bg-card focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Weekday Daytime */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Weekday Day (6am-6pm)</label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">₹</span>
+                                <input
+                                  type="text"
+                                  disabled={user?.role !== 'admin'}
+                                  value={rules.weekday_daytime}
+                                  onChange={(e) => {
+                                    setSlotPricing({
+                                      ...slotPricing,
+                                      [ground.id]: {
+                                        ...rules,
+                                        weekday_daytime: e.target.value.replace(/\D/g, '')
+                                      }
+                                    });
+                                  }}
+                                  className="w-full pl-7 pr-3 py-2 bg-muted/20 border border-border rounded-xl text-xs font-bold text-foreground focus:bg-card focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Weekday Nighttime */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Weekday Night (6pm-6am)</label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">₹</span>
+                                <input
+                                  type="text"
+                                  disabled={user?.role !== 'admin'}
+                                  value={rules.weekday_nighttime}
+                                  onChange={(e) => {
+                                    setSlotPricing({
+                                      ...slotPricing,
+                                      [ground.id]: {
+                                        ...rules,
+                                        weekday_nighttime: e.target.value.replace(/\D/g, '')
+                                      }
+                                    });
+                                  }}
+                                  className="w-full pl-7 pr-3 py-2 bg-muted/20 border border-border rounded-xl text-xs font-bold text-foreground focus:bg-card focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Weekend Daytime */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Weekend Day (6am-6pm)</label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">₹</span>
+                                <input
+                                  type="text"
+                                  disabled={user?.role !== 'admin'}
+                                  value={rules.weekend_daytime}
+                                  onChange={(e) => {
+                                    setSlotPricing({
+                                      ...slotPricing,
+                                      [ground.id]: {
+                                        ...rules,
+                                        weekend_daytime: e.target.value.replace(/\D/g, '')
+                                      }
+                                    });
+                                  }}
+                                  className="w-full pl-7 pr-3 py-2 bg-muted/20 border border-border rounded-xl text-xs font-bold text-foreground focus:bg-card focus:outline-none"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Weekend Nighttime */}
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Weekend Night (6pm-6am)</label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">₹</span>
+                                <input
+                                  type="text"
+                                  disabled={user?.role !== 'admin'}
+                                  value={rules.weekend_nighttime}
+                                  onChange={(e) => {
+                                    setSlotPricing({
+                                      ...slotPricing,
+                                      [ground.id]: {
+                                        ...rules,
+                                        weekend_nighttime: e.target.value.replace(/\D/g, '')
+                                      }
+                                    });
+                                  }}
+                                  className="w-full pl-7 pr-3 py-2 bg-muted/20 border border-border rounded-xl text-xs font-bold text-foreground focus:bg-card focus:outline-none"
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

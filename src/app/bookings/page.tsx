@@ -141,7 +141,7 @@ function BookingsContent() {
   };
 
   // Pricing helper for slot
-  const getSlotPrice = (dateStr: string, slot: string): number => {
+  const getSlotPrice = (groundId: string, dateStr: string, slot: string): number => {
     if (!dateStr) return 0;
     const [year, month, day] = dateStr.split('-').map(Number);
     const date = new Date(year, month - 1, day);
@@ -150,9 +150,36 @@ function BookingsContent() {
     const hour = parseInt(slot.split(':')[0]);
     const isDaytime = hour >= 6 && hour < 18; // 6:00 AM to 6:00 PM
     
+    // Check if custom time slot rates are stored in localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('turf_slot_pricing');
+        if (stored) {
+          const customRates = JSON.parse(stored);
+          if (customRates && customRates[groundId]) {
+            const rules = customRates[groundId];
+            if (isWeekend) {
+              return isDaytime ? (Number(rules.weekend_daytime) || 700) : (Number(rules.weekend_nighttime) || 1200);
+            } else {
+              return isDaytime ? (Number(rules.weekday_daytime) || 600) : (Number(rules.weekday_nighttime) || 1000);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Error reading custom slot rates:', e);
+      }
+    }
+    
+    // Fallbacks
     if (isWeekend) {
+      if (groundId === 'g2') {
+        return isDaytime ? 600 : 1000;
+      }
       return isDaytime ? 700 : 1200;
     } else {
+      if (groundId === 'g2') {
+        return isDaytime ? 500 : 800;
+      }
       return isDaytime ? 600 : 1000;
     }
   };
@@ -247,6 +274,7 @@ function BookingsContent() {
           onClick={() => {
             setFormDate(dateStr);
             setFormError(null);
+            setSelectedSlots([]);
           }}
           className={`h-9 w-9 mx-auto rounded-lg text-xs font-bold flex items-center justify-center transition-all ${
             isDisabled
@@ -395,7 +423,7 @@ function BookingsContent() {
 
   // Helpers to calculate prices
   const calculateTotalPrice = () => {
-    return selectedSlots.reduce((sum, slot) => sum + getSlotPrice(formDate, slot), 0);
+    return selectedSlots.reduce((sum, slot) => sum + getSlotPrice(formGroundId, formDate, slot), 0);
   };
 
   const calculateFinalAmount = () => {
@@ -603,7 +631,7 @@ function BookingsContent() {
         });
         
         showToast('Booking updated successfully!', 'success');
-        setWizardStep(5); // Success step
+        setWizardStep(6); // Success step
       } else {
         // Create mode: group contiguous slots
         const groups = groupSlots(selectedSlots);
@@ -612,12 +640,12 @@ function BookingsContent() {
         // Save bookings
         const bookingsToCreate = groups.map(group => {
           const slotList: string[] = [];
-          const startHr = parseInt(group.startTime.split(':')[0]);
-          const endHr = parseInt(group.endTime.split(':')[0]);
-          for (let h = startHr; h < endHr; h++) {
+          const startHour = parseInt(group.startTime.split(':')[0]);
+          const endHour = parseInt(group.endTime.split(':')[0]);
+          for (let h = startHour; h < endHour; h++) {
             slotList.push(`${h.toString().padStart(2, '0')}:00`);
           }
-          const groupBaseAmount = slotList.reduce((sum, s) => sum + getSlotPrice(formDate, s), 0);
+          const groupBaseAmount = slotList.reduce((sum, s) => sum + getSlotPrice(formGroundId, formDate, s), 0);
           const shareOfDiscount = Math.round((groupBaseAmount / calculatedAmount) * discountVal);
           const finalAmount = Math.max(0, groupBaseAmount - shareOfDiscount);
 
@@ -714,7 +742,7 @@ function BookingsContent() {
           paymentSummary: paymentSummaryText,
           bookingIds: createdBookingIds
         });
-        setWizardStep(5);
+        setWizardStep(6);
         showToast('Booking created successfully!', 'success');
       }
     } catch (err: any) {
@@ -1451,7 +1479,7 @@ function BookingsContent() {
       {/* 2. ADD / EDIT BOOKING FORM DRAWER */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-card w-full max-w-5xl rounded-2xl shadow-xl border border-border overflow-hidden animate-scale-in text-left flex flex-col max-h-[95vh] sm:max-h-[90vh]">
+          <div className="bg-card w-full max-w-5xl rounded-2xl shadow-xl border border-border overflow-hidden animate-scale-in text-left flex flex-col h-[600px] max-h-[95vh] md:h-[650px] md:max-h-[90vh]">
             {/* Header */}
             <div className="bg-primary p-5 text-white flex items-center justify-between shrink-0">
               <h3 className="font-bold text-md flex items-center gap-2">
@@ -1470,14 +1498,15 @@ function BookingsContent() {
             </div>
 
             {/* Wizard Steps Tracker */}
-            {wizardStep < 5 && (
+            {wizardStep < 6 && (
               <div className="bg-muted/30 px-6 py-4 border-b border-border/80 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-1 w-full justify-between max-w-lg mx-auto">
+                <div className="flex items-center gap-1 w-full justify-between max-w-xl mx-auto">
                   {[
                     { s: 1, label: 'Customer' },
-                    { s: 2, label: 'Schedule' },
-                    { s: 3, label: 'Review' },
-                    { s: 4, label: 'Payment' }
+                    { s: 2, label: 'Turf & Date' },
+                    { s: 3, label: 'Slots' },
+                    { s: 4, label: 'Review' },
+                    { s: 5, label: 'Payment' }
                   ].map((step, idx, arr) => (
                     <React.Fragment key={step.s}>
                       <div className="flex flex-col items-center gap-1 relative">
@@ -1517,131 +1546,133 @@ function BookingsContent() {
               </div>
             )}
 
-            {/* Wizard Content Body (Scrollable) */}
-            <div className="p-6 overflow-y-auto flex-1">
+            {/* Wizard Content Body */}
+            <div className="p-5 sm:p-6 overflow-y-auto flex-1 flex flex-col">
               
               {/* STEP 1: CUSTOMER PROFILE DETAILS */}
               {wizardStep === 1 && (
-                <div className="space-y-5">
-                  <div>
-                    <h4 className="font-bold text-sm text-foreground">Customer Profile Details</h4>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Select an existing customer profile or enter details to register a new customer.</p>
-                  </div>
+                <div className="space-y-5 flex flex-col justify-between flex-1">
+                  <div className="space-y-5">
+                    <div>
+                      <h4 className="font-bold text-sm text-foreground">Customer Profile Details</h4>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Select an existing customer profile or enter details to register a new customer.</p>
+                    </div>
 
-                  {/* Customer search query */}
-                  {!formCustomerId && (
-                    <div className="space-y-1.5 relative">
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Search Existing Customer</label>
-                      <input
-                        type="text"
-                        placeholder="Search by name or mobile number..."
-                        value={customerSearchQuery}
-                        onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-muted/20 border border-border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      />
-                      
-                      {/* Dropdown list of filtered customers with Framer Motion Animation */}
-                      <AnimatePresence>
-                        {customerSearchQuery.trim() !== '' && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -4, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                            transition={{ duration: 0.12, ease: [0, 0, 0.2, 1] }}
-                            className="absolute z-50 w-full mt-1.5 bg-card border border-border rounded-xl shadow-2xl max-h-48 overflow-y-auto p-1.5 space-y-0.5"
-                          >
-                            {customers.filter(c => 
-                              c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-                              c.phone.includes(customerSearchQuery)
-                            ).length > 0 ? (
-                              customers.filter(c => 
+                    {/* Customer search query */}
+                    {!formCustomerId && (
+                      <div className="space-y-1.5 relative">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Search Existing Customer</label>
+                        <input
+                          type="text"
+                          placeholder="Search by name or mobile number..."
+                          value={customerSearchQuery}
+                          onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-muted/20 border border-border rounded-xl text-[16px] sm:text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                        
+                        {/* Dropdown list of filtered customers with Framer Motion Animation */}
+                        <AnimatePresence>
+                          {customerSearchQuery.trim() !== '' && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -4, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -4, scale: 0.95 }}
+                              transition={{ duration: 0.12, ease: [0, 0, 0.2, 1] }}
+                              className="absolute z-50 w-full mt-1.5 bg-card border border-border rounded-xl shadow-2xl max-h-48 overflow-y-auto p-1.5 space-y-0.5"
+                            >
+                              {customers.filter(c => 
                                 c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
                                 c.phone.includes(customerSearchQuery)
-                              ).map(c => (
-                                <button
-                                  key={c.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setFormCustomerId(c.id);
-                                    setFormCustName(c.name);
-                                    setFormCustPhone(c.phone);
-                                    setCustomerSearchQuery('');
-                                    setFormError(null);
-                                  }}
-                                  className="w-full text-left px-3 py-2.5 hover:bg-[#eef7f2] hover:text-[#0c4a28] rounded-lg transition-colors text-xs font-bold flex items-center justify-between cursor-pointer focus:outline-none focus:bg-[#eef7f2] focus:text-[#0c4a28]"
-                                >
-                                  <span>{c.name}</span>
-                                  <span className="text-[10px] text-muted-foreground font-mono">{c.phone}</span>
-                                </button>
-                              ))
-                            ) : (
-                              <div className="px-4 py-3 text-xs text-muted-foreground text-center font-bold">
-                                No matching customers found. Register as a new customer below.
-                              </div>
-                            )}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  )}
+                              ).length > 0 ? (
+                                customers.filter(c => 
+                                  c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+                                  c.phone.includes(customerSearchQuery)
+                                ).map(c => (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setFormCustomerId(c.id);
+                                      setFormCustName(c.name);
+                                      setFormCustPhone(c.phone);
+                                      setCustomerSearchQuery('');
+                                      setFormError(null);
+                                    }}
+                                    className="w-full text-left px-3 py-2.5 hover:bg-[#eef7f2] hover:text-[#0c4a28] rounded-lg transition-colors text-xs font-bold flex items-center justify-between cursor-pointer focus:outline-none focus:bg-[#eef7f2] focus:text-[#0c4a28]"
+                                  >
+                                    <span>{c.name}</span>
+                                    <span className="text-[10px] text-muted-foreground font-mono">{c.phone}</span>
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="px-4 py-3 text-xs text-muted-foreground text-center font-bold">
+                                  No matching customers found. Register as a new customer below.
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
 
-                  {/* Customer details display */}
-                  {formCustomerId ? (
-                    <div className="bg-accent/40 rounded-xl p-4 border border-primary/10 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-primary/10 text-primary border border-primary/20 rounded-xl flex items-center justify-center font-bold text-sm">
-                          {formCustName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs text-foreground flex items-center gap-1.5">
-                            {formCustName}
-                            <span className="text-[9px] font-bold bg-primary/15 text-primary px-1.5 py-0.5 rounded-md uppercase">Saved Profile</span>
-                          </h4>
-                          <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{formCustPhone}</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormCustomerId('');
-                          setFormCustName('');
-                          setFormCustPhone('');
-                        }}
-                        className="py-1.5 px-3 border border-border bg-card hover:bg-muted text-red-650 font-bold rounded-xl text-[10px] transition-all cursor-pointer"
-                      >
-                        Change Customer
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="bg-muted/10 p-4 border border-border/80 rounded-2xl space-y-4">
-                        <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-md uppercase">New Customer Details</span>
-                        <div className="grid grid-cols-2 gap-4 pt-1">
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Customer Name</label>
-                            <input
-                              type="text"
-                              placeholder="Sachin Tendulkar"
-                              value={formCustName}
-                              onChange={(e) => setFormCustName(e.target.value)}
-                              className="w-full px-3 py-2 bg-card border border-border rounded-xl text-xs font-semibold focus:outline-none"
-                            />
+                    {/* Customer details display */}
+                    {formCustomerId ? (
+                      <div className="bg-accent/40 rounded-xl p-4 border border-primary/10 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 bg-primary/10 text-primary border border-primary/20 rounded-xl flex items-center justify-center font-bold text-sm">
+                            {formCustName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                           </div>
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Mobile Phone</label>
-                            <input
-                              type="text"
-                              maxLength={10}
-                              placeholder="9876543210"
-                              value={formCustPhone}
-                              onChange={(e) => setFormCustPhone(e.target.value.replace(/\D/g, ''))}
-                              className="w-full px-3 py-2 bg-card border border-border rounded-xl text-xs font-semibold font-mono focus:outline-none"
-                            />
+                          <div>
+                            <h4 className="font-bold text-xs text-foreground flex items-center gap-1.5">
+                              {formCustName}
+                              <span className="text-[9px] font-bold bg-primary/15 text-primary px-1.5 py-0.5 rounded-md uppercase">Saved Profile</span>
+                            </h4>
+                            <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{formCustPhone}</p>
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormCustomerId('');
+                            setFormCustName('');
+                            setFormCustPhone('');
+                          }}
+                          className="py-1.5 px-3 border border-border bg-card hover:bg-muted text-red-650 font-bold rounded-xl text-[10px] transition-all cursor-pointer"
+                        >
+                          Change Customer
+                        </button>
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="bg-muted/10 p-4 border border-border/80 rounded-2xl space-y-4">
+                          <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-md uppercase">New Customer Details</span>
+                          <div className="grid grid-cols-2 gap-4 pt-1">
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Customer Name</label>
+                              <input
+                                type="text"
+                                placeholder="Sachin Tendulkar"
+                                value={formCustName}
+                                onChange={(e) => setFormCustName(e.target.value)}
+                                className="w-full px-3 py-2 bg-card border border-border rounded-xl text-[16px] sm:text-xs font-semibold focus:outline-none"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Mobile Phone</label>
+                              <input
+                                type="text"
+                                maxLength={10}
+                                placeholder="9876543210"
+                                value={formCustPhone}
+                                onChange={(e) => setFormCustPhone(e.target.value.replace(/\D/g, ''))}
+                                className="w-full px-3 py-2 bg-card border border-border rounded-xl text-[16px] sm:text-xs font-semibold font-mono focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Wizard Step 1 Footer */}
                   <div className="flex items-center gap-3 pt-4 border-t border-border/60 justify-end shrink-0">
@@ -1671,229 +1702,306 @@ function BookingsContent() {
                       }}
                       className="py-2.5 px-6 bg-primary hover:bg-primary/95 text-white rounded-xl text-xs font-bold cursor-pointer transition-all hover:translate-x-0.5"
                     >
-                      Next: Schedule
+                      Next: Turf & Date
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* STEP 2: MERGED CALENDAR & SLOTS GRID */}
+              {/* STEP 2: SELECT TURF BOX & DATE */}
               {wizardStep === 2 && (
-                <div className="space-y-5">
-                  {/* Turf Selector Box */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider block">1. Select Box</label>
-                    <div className="grid grid-cols-2 gap-4">
-                      {grounds.map((g, idx) => {
-                        const isSelected = formGroundId === g.id;
-                        const boxName = idx === 0 ? 'Box 1 (Premium Turf)' : 'Box 2 (Standard Turf)';
-                        return (
-                          <button
-                            key={g.id}
-                            type="button"
-                            onClick={() => {
-                              setFormGroundId(g.id);
-                              setFormError(null);
-                            }}
-                            className={`p-4 border rounded-2xl cursor-pointer text-left transition-all flex flex-col items-start ${
-                              isSelected
-                                ? 'bg-[#0c4a28]/10 border-[#0c4a28] shadow-md ring-2 ring-[#0c4a28]/25'
-                                : 'bg-card border-border hover:bg-muted/40'
-                            }`}
-                          >
-                            <span className="font-bold text-xs text-foreground">{boxName}</span>
-                            <span className="text-[10px] text-primary font-black mt-1">₹{g.hourly_rate.toString().split('.')[0]}/hr</span>
-                          </button>
-                        );
-                      })}
+                <div className="space-y-4 flex flex-col justify-between flex-1">
+                  <div className="space-y-4">
+                    {/* Turf Selector Box */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-muted-foreground uppercase tracking-wider block">1. Select Box</label>
+                      <div className="grid grid-cols-2 gap-4">
+                        {grounds.map((g, idx) => {
+                          const isSelected = formGroundId === g.id;
+                          const boxName = idx === 0 ? 'Box 1 (Premium Turf)' : 'Box 2 (Standard Turf)';
+                          return (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => {
+                                setFormGroundId(g.id);
+                                setFormError(null);
+                                setSelectedSlots([]);
+                              }}
+                              className={`p-3.5 border rounded-2xl cursor-pointer text-left transition-all flex flex-col items-start ${
+                                isSelected
+                                  ? 'bg-[#0c4a28]/10 border-[#0c4a28] shadow-md ring-2 ring-[#0c4a28]/25'
+                                  : 'bg-card border-border hover:bg-muted/40'
+                              }`}
+                            >
+                              <span className="font-bold text-xs text-foreground">{boxName}</span>
+                              <span className="text-[10px] text-primary font-black mt-1">
+                                {(() => {
+                                  // Load weekday daytime rate from custom rates if set
+                                  if (typeof window !== 'undefined') {
+                                    try {
+                                      const stored = localStorage.getItem('turf_slot_pricing');
+                                      if (stored) {
+                                        const customRates = JSON.parse(stored);
+                                        if (customRates && customRates[g.id]) {
+                                          return `₹${customRates[g.id].weekday_daytime}/hr`;
+                                        }
+                                      }
+                                    } catch (e) {}
+                                  }
+                                  return `₹${g.hourly_rate.toString().split('.')[0]}/hr`;
+                                })()}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Sleek Dark unified panel like screenshot, matched to site colors */}
-                  <div className="bg-[#0d1e15] border border-emerald-950/60 rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col gap-6">
-                    {/* Columns Wrapper */}
-                    <div className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr] gap-6 items-start">
-                      {/* Left: Date Selector */}
+                    {/* Unified dark panel for calendar only */}
+                    <div className="bg-[#0d1e15] border border-emerald-950/60 rounded-3xl p-4 sm:p-5 shadow-2xl">
                       <div className="space-y-3">
                         <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">2. Select Date</label>
                         {renderWizardCalendar()}
                       </div>
-
-                      {/* Right: Time slots list */}
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">3. Select Slots</label>
-                        
-                        <div className="flex flex-col gap-2.5 overflow-y-auto h-[280px] pr-1.5 font-mono">
-                          {TIME_SLOTS.slice(0, -1).map((slot) => {
-                            const isBooked = isSlotBooked(formGroundId, formDate, slot);
-                            const isSelected = selectedSlots.includes(slot);
-                            const price = getSlotPrice(formDate, slot);
-                            const displayTime = formatSlotTimeOnly(slot);
-
-                            if (isBooked) {
-                              return (
-                                <button
-                                  key={slot}
-                                  type="button"
-                                  disabled
-                                  className="w-full py-2.5 px-4 border border-red-950/60 bg-red-950/40 text-red-400 font-extrabold rounded-xl text-xs flex items-center justify-between cursor-not-allowed"
-                                >
-                                  <span>{displayTime}</span>
-                                  <span className="bg-red-950/80 border border-red-800 text-red-500 text-[9px] font-black uppercase px-2 py-0.5 rounded-lg flex items-center gap-1 shrink-0">
-                                    <Check className="h-3.5 w-3.5 stroke-[3] text-red-500" />
-                                    Booked
-                                  </span>
-                                </button>
-                              );
-                            }
-
-                            return (
-                              <button
-                                key={slot}
-                                type="button"
-                                onClick={() => {
-                                  if (isSelected) {
-                                    setSelectedSlots(selectedSlots.filter(s => s !== slot));
-                                  } else {
-                                    setSelectedSlots([...selectedSlots, slot].sort());
-                                  }
-                                  setFormError(null);
-                                }}
-                                className={`w-full py-2.5 px-4 border rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer shadow-sm ${
-                                  isSelected
-                                    ? 'bg-white text-[#0c4a28] border-white font-extrabold shadow-md'
-                                    : 'bg-emerald-950/30 border border-emerald-900/60 text-emerald-100 hover:bg-emerald-900/20'
-                                }`}
-                              >
-                                <span>{displayTime}</span>
-                                <span className={isSelected ? 'text-[#0c4a28]' : 'text-emerald-400'}>₹{price}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
                     </div>
+                  </div>
 
-                    {/* Bottom Row: Selected info and Continue button (mirrors screenshot bottom row) */}
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-emerald-950/60 shrink-0">
-                      <div className="text-left text-xs font-bold text-emerald-100">
-                        {formDate && selectedSlots.length > 0 ? (
-                          <span>
-                            Selected: Box {formGroundId === grounds[0]?.id ? '1' : '2'} on {formatSummaryDate(formDate)} at {getSelectedSlotsSummary()}
-                          </span>
-                        ) : (
-                          <span className="text-emerald-400/50 italic">Please select date and time slots</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                        <button
-                          type="button"
-                          onClick={() => setWizardStep(1)}
-                          className="py-2.5 px-5 border border-emerald-800 text-emerald-200 hover:bg-emerald-900/30 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                        >
-                          Back
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!formGroundId || !formDate || selectedSlots.length === 0}
-                          onClick={() => {
-                            setFormError(null);
-                            setWizardStep(3);
-                          }}
-                          className={`py-2.5 px-6 rounded-xl text-xs font-extrabold transition-all ${
-                            formGroundId && formDate && selectedSlots.length > 0
-                              ? 'bg-white hover:bg-emerald-50 text-[#0c4a28] shadow-md cursor-pointer'
-                              : 'bg-emerald-900/40 text-emerald-400/50 cursor-not-allowed border-none'
-                          }`}
-                        >
-                          Continue
-                        </button>
-                      </div>
+                  {/* Wizard Step 2 Footer */}
+                  <div className="flex items-center gap-3 pt-4 border-t border-border/60 justify-between shrink-0">
+                    <div className="text-left text-xs font-bold text-muted-foreground">
+                      {formDate ? (
+                        <span>
+                          Selected Date: <span className="text-primary font-extrabold">{formatSummaryDate(formDate)}</span>
+                        </span>
+                      ) : (
+                        <span className="italic">Please select a date</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setWizardStep(1)}
+                        className="py-2.5 px-6 border border-border bg-card hover:bg-muted rounded-xl text-xs font-bold text-muted-foreground cursor-pointer"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!formGroundId || !formDate}
+                        onClick={() => {
+                          setFormError(null);
+                          setWizardStep(3);
+                        }}
+                        className={`py-2.5 px-6 rounded-xl text-xs font-bold transition-all ${
+                          formGroundId && formDate
+                            ? 'bg-primary hover:bg-primary/95 text-white shadow-md cursor-pointer'
+                            : 'bg-muted text-muted-foreground/50 cursor-not-allowed border-none'
+                        }`}
+                      >
+                        Next: Select Slots
+                      </button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* STEP 3: REVIEW BOOKING DETAILS */}
+              {/* STEP 3: SELECT TIME SLOTS */}
               {wizardStep === 3 && (
-                <div className="space-y-5">
-                  <div>
-                    <h4 className="font-bold text-sm text-foreground">Review Booking Details</h4>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Please review the details and configure discount or notes if needed.</p>
-                  </div>
+                <div className="space-y-4 flex flex-col justify-between flex-1">
+                  <div className="space-y-4">
+                    {/* Header summary info */}
+                    <div className="bg-[#0c4a28]/10 border border-[#0c4a28]/20 rounded-2xl p-4 flex justify-between items-center text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase block">Selected Turf</span>
+                        <span className="font-extrabold text-foreground">{formGroundId === grounds[0]?.id ? 'Box 1 (Premium Turf)' : 'Box 2 (Standard Turf)'}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase block">Selected Date</span>
+                        <span className="font-extrabold text-foreground font-mono">{formatSummaryDate(formDate)}</span>
+                      </div>
+                    </div>
 
-                  {/* Details Summary Card */}
-                  <div className="grid grid-cols-2 gap-4 bg-muted/20 border border-border/60 p-4 rounded-2xl">
-                    <div className="space-y-1">
-                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Customer Profile</span>
-                      <span className="text-xs font-bold text-foreground block">{formCustName} ({formCustPhone})</span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Turf Box / Ground</span>
-                      <span className="text-xs font-bold text-foreground block">{formGroundId === grounds[0]?.id ? 'Box 1 (Premium Turf)' : 'Box 2 (Standard Turf)'}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Booking Date</span>
-                      <span className="text-xs font-bold text-foreground block font-mono">
-                        {new Date(formDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Booking Slots</span>
-                      <span className="text-[10px] font-bold text-foreground block max-h-16 overflow-y-auto font-mono">
-                        {selectedSlots.map(s => formatSlotDisplay(s)).join(', ')}
-                      </span>
-                    </div>
-                  </div>
+                    {/* Dark Unified panel for time slots */}
+                    <div className="bg-[#0d1e15] border border-emerald-950/60 rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">3. Select Time Slots</label>
+                        <p className="text-[10px] text-emerald-250/70 mt-0.5">Click slots to add or remove them from this booking.</p>
+                      </div>
 
-                  {/* Discount and Notes */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Discount (₹)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={calculateTotalPrice()}
-                        value={formDiscount}
-                        onChange={(e) => setFormDiscount(e.target.value)}
-                        onWheel={(e) => e.currentTarget.blur()}
-                        className="w-full px-3 py-2 bg-muted/25 border border-border rounded-xl text-xs font-bold focus:outline-none"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Additional Notes</label>
-                      <textarea
-                        placeholder="E.g., extra stumps, regular customer, etc."
-                        value={formNotes}
-                        onChange={(e) => setFormNotes(e.target.value)}
-                        rows={2}
-                        className="w-full px-3 py-1.5 bg-muted/25 border border-border rounded-xl text-xs font-semibold focus:outline-none"
-                      ></textarea>
-                    </div>
-                  </div>
+                      {/* Time slots grid: 2 columns on mobile, 3/4 on larger screens */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 overflow-y-auto max-h-[240px] pr-1.5 font-mono">
+                        {TIME_SLOTS.slice(0, -1).map((slot) => {
+                          const isBooked = isSlotBooked(formGroundId, formDate, slot);
+                          const isSelected = selectedSlots.includes(slot);
+                          const price = getSlotPrice(formGroundId, formDate, slot);
+                          const displayTime = formatSlotTimeOnly(slot);
 
-                  {/* Billing Card */}
-                  <div className="bg-accent/40 rounded-xl p-4 border border-primary/10 space-y-2 text-xs">
-                    <div className="flex justify-between font-semibold text-muted-foreground">
-                      <span>Total Booked Rate:</span>
-                      <span>₹{calculateTotalPrice()}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold text-red-650">
-                      <span>Discount:</span>
-                      <span>-₹{Number(formDiscount) || 0}</span>
-                    </div>
-                    <div className="h-px bg-border/80 my-1"></div>
-                    <div className="flex justify-between font-black text-sm text-primary">
-                      <span>Net Total Payable Bill:</span>
-                      <span>₹{calculateFinalAmount()}</span>
+                          if (isBooked) {
+                            return (
+                              <button
+                                key={slot}
+                                type="button"
+                                disabled
+                                className="w-full py-2 px-2 border border-red-950/60 bg-red-950/40 text-red-400 font-extrabold rounded-xl text-[11px] flex flex-col items-center justify-center gap-1 cursor-not-allowed opacity-75 shrink-0"
+                              >
+                                <span>{displayTime}</span>
+                                <span className="bg-red-950/80 border border-red-800 text-red-500 text-[8px] font-black uppercase px-1 py-0.5 rounded-md flex items-center gap-0.5">
+                                  <Check className="h-3 w-3 stroke-[3]" />
+                                  Booked
+                                </span>
+                              </button>
+                            );
+                          }
+
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedSlots(selectedSlots.filter(s => s !== slot));
+                                } else {
+                                  setSelectedSlots([...selectedSlots, slot].sort());
+                                }
+                                setFormError(null);
+                              }}
+                              className={`w-full py-2 px-2 border rounded-xl text-[11px] font-bold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer shadow-sm shrink-0 ${
+                                isSelected
+                                  ? 'bg-white text-[#0c4a28] border-white font-extrabold shadow-md'
+                                  : 'bg-emerald-950/30 border border-emerald-900/60 text-emerald-100 hover:bg-emerald-900/20'
+                              }`}
+                            >
+                              <span>{displayTime}</span>
+                              <span className={isSelected ? 'text-[#0c4a28] font-black' : 'text-emerald-400 font-semibold'}>₹{price}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
 
                   {/* Wizard Step 3 Footer */}
                   <div className="flex items-center gap-3 pt-4 border-t border-border/60 justify-between shrink-0">
+                    <div className="text-left text-xs font-bold text-muted-foreground truncate max-w-[50%]">
+                      {selectedSlots.length > 0 ? (
+                        <span>
+                          Selected: <span className="text-primary font-extrabold">{selectedSlots.length} slot(s)</span>
+                        </span>
+                      ) : (
+                        <span className="italic">No slots selected</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setWizardStep(2)}
+                        className="py-2.5 px-6 border border-border bg-card hover:bg-muted rounded-xl text-xs font-bold text-muted-foreground cursor-pointer"
+                      >
+                        Back
+                      </button>
+                      <button
+                        type="button"
+                        disabled={selectedSlots.length === 0}
+                        onClick={() => {
+                          setFormError(null);
+                          setWizardStep(4);
+                        }}
+                        className={`py-2.5 px-6 rounded-xl text-xs font-bold transition-all ${
+                          selectedSlots.length > 0
+                            ? 'bg-primary hover:bg-primary/95 text-white shadow-md cursor-pointer'
+                            : 'bg-muted text-muted-foreground/50 cursor-not-allowed border-none'
+                        }`}
+                      >
+                        Next: Review
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 4: REVIEW BOOKING DETAILS */}
+              {wizardStep === 4 && (
+                <div className="space-y-4 flex flex-col justify-between flex-1">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-bold text-sm text-foreground">Review Booking Details</h4>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Please review the details and configure discount or notes if needed.</p>
+                    </div>
+
+                    {/* Details Summary Card */}
+                    <div className="grid grid-cols-2 gap-4 bg-muted/20 border border-border/60 p-3 sm:p-4 rounded-2xl">
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Customer Profile</span>
+                        <span className="text-xs font-bold text-foreground block">{formCustName} ({formCustPhone})</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Turf Box / Ground</span>
+                        <span className="text-xs font-bold text-foreground block">{formGroundId === grounds[0]?.id ? 'Box 1 (Premium Turf)' : 'Box 2 (Standard Turf)'}</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Booking Date</span>
+                        <span className="text-xs font-bold text-foreground block font-mono">
+                          {new Date(formDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Booking Slots</span>
+                        <span className="text-[10px] font-bold text-foreground block max-h-12 overflow-y-auto font-mono">
+                          {selectedSlots.map(s => formatSlotDisplay(s)).join(', ')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Discount and Notes */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Discount (₹)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={calculateTotalPrice()}
+                          value={formDiscount}
+                          onChange={(e) => setFormDiscount(e.target.value)}
+                          onWheel={(e) => e.currentTarget.blur()}
+                          className="w-full px-3 py-2 bg-muted/25 border border-border rounded-xl text-[16px] sm:text-xs font-bold focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Additional Notes</label>
+                        <textarea
+                          placeholder="E.g., extra stumps, regular customer, etc."
+                          value={formNotes}
+                          onChange={(e) => setFormNotes(e.target.value)}
+                          rows={2}
+                          className="w-full px-3 py-1.5 bg-muted/25 border border-border rounded-xl text-[16px] sm:text-xs font-semibold focus:outline-none"
+                        ></textarea>
+                      </div>
+                    </div>
+
+                    {/* Billing Card */}
+                    <div className="bg-accent/40 rounded-xl p-3 sm:p-4 border border-primary/10 space-y-1 text-xs">
+                      <div className="flex justify-between font-semibold text-muted-foreground">
+                        <span>Total Booked Rate:</span>
+                        <span>₹{calculateTotalPrice()}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold text-red-650">
+                        <span>Discount:</span>
+                        <span>-₹{Number(formDiscount) || 0}</span>
+                      </div>
+                      <div className="h-px bg-border/80 my-1"></div>
+                      <div className="flex justify-between font-black text-sm text-primary">
+                        <span>Net Total Payable Bill:</span>
+                        <span>₹{calculateFinalAmount()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Wizard Step 4 Footer */}
+                  <div className="flex items-center gap-3 pt-4 border-t border-border/60 justify-between shrink-0">
                     <button
                       type="button"
-                      onClick={() => setWizardStep(2)}
+                      onClick={() => setWizardStep(3)}
                       className="py-2.5 px-6 border border-border bg-card hover:bg-muted rounded-xl text-xs font-bold text-muted-foreground cursor-pointer"
                     >
                       Back
@@ -1904,7 +2012,7 @@ function BookingsContent() {
                         const total = calculateFinalAmount();
                         setUpiSplitAmount(total.toString());
                         setCashSplitAmount('0');
-                        setWizardStep(4);
+                        setWizardStep(5);
                       }}
                       className="py-2.5 px-6 bg-primary hover:bg-primary/95 text-white rounded-xl text-xs font-bold cursor-pointer transition-all hover:translate-x-0.5"
                     >
@@ -1914,100 +2022,102 @@ function BookingsContent() {
                 </div>
               )}
 
-              {/* STEP 4: PAYMENT (UPI, CASH, OR SPLIT) */}
-              {wizardStep === 4 && (
-                <div className="space-y-5">
-                  <div>
-                    <h4 className="font-bold text-sm text-foreground">Select Payment Method</h4>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Select a full payment mode or split the total amount between UPI and Cash.</p>
-                  </div>
-
-                  <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 text-center space-y-1">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Final Amount Due</span>
-                    <span className="text-xl font-black text-primary block">₹{calculateFinalAmount()}</span>
-                  </div>
-
-                  {/* Payment Mode Selector */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Payment Mode</label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {(['UPI', 'Cash', 'Split'] as const).map(mode => {
-                        const isSelected = paymentMode === mode;
-                        return (
-                          <button
-                            key={mode}
-                            type="button"
-                            onClick={() => {
-                              setPaymentMode(mode);
-                              const total = calculateFinalAmount();
-                              if (mode === 'Split') {
-                                setUpiSplitAmount(Math.round(total / 2).toString());
-                                setCashSplitAmount((total - Math.round(total / 2)).toString());
-                              } else {
-                                setUpiSplitAmount(mode === 'UPI' ? total.toString() : '0');
-                                setCashSplitAmount(mode === 'Cash' ? total.toString() : '0');
-                              }
-                            }}
-                            className={`py-3.5 px-3 border rounded-xl text-xs font-bold cursor-pointer transition-all ${
-                              isSelected
-                                ? 'bg-primary text-white border-primary shadow-sm shadow-primary/10 font-black'
-                                : 'bg-card border-border hover:bg-muted text-muted-foreground'
-                            }`}
-                          >
-                            {mode}
-                          </button>
-                        );
-                      })}
+              {/* STEP 5: SELECT PAYMENT METHOD */}
+              {wizardStep === 5 && (
+                <div className="space-y-4 flex flex-col justify-between flex-1">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-bold text-sm text-foreground">Select Payment Method</h4>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Select a full payment mode or split the total amount between UPI and Cash.</p>
                     </div>
-                  </div>
 
-                  {/* Split payment inputs */}
-                  {paymentMode === 'Split' ? (
-                    <div className="grid grid-cols-2 gap-4 bg-muted/20 rounded-xl p-4 border border-border/50">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">UPI Split Amount (₹)</label>
-                        <input
-                          type="number"
-                          min={0}
-                          max={calculateFinalAmount()}
-                          value={upiSplitAmount}
-                          onChange={(e) => handleUpiSplitChange(e.target.value)}
-                          onWheel={(e) => e.currentTarget.blur()}
-                          className="w-full px-3 py-2 bg-card border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cash Split Amount (₹)</label>
-                        <input
-                          type="number"
-                          min={0}
-                          max={calculateFinalAmount()}
-                          value={cashSplitAmount}
-                          onChange={(e) => handleCashSplitChange(e.target.value)}
-                          onWheel={(e) => e.currentTarget.blur()}
-                          className="w-full px-3 py-2 bg-card border border-border rounded-xl text-xs font-bold text-foreground focus:outline-none"
-                        />
+                    <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 text-center space-y-1">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Final Amount Due</span>
+                      <span className="text-xl font-black text-primary block">₹{calculateFinalAmount()}</span>
+                    </div>
+
+                    {/* Payment Mode Selector */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Payment Mode</label>
+                      <div className="grid grid-cols-3 gap-3">
+                        {(['UPI', 'Cash', 'Split'] as const).map(mode => {
+                          const isSelected = paymentMode === mode;
+                          return (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => {
+                                setPaymentMode(mode);
+                                const total = calculateFinalAmount();
+                                if (mode === 'Split') {
+                                  setUpiSplitAmount(Math.round(total / 2).toString());
+                                  setCashSplitAmount((total - Math.round(total / 2)).toString());
+                                } else {
+                                  setUpiSplitAmount(mode === 'UPI' ? total.toString() : '0');
+                                  setCashSplitAmount(mode === 'Cash' ? total.toString() : '0');
+                                }
+                              }}
+                              className={`py-3 px-3 border rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'bg-primary text-white border-primary shadow-sm shadow-primary/10 font-black'
+                                  : 'bg-card border-border hover:bg-muted text-muted-foreground'
+                              }`}
+                            >
+                              {mode}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
-                  ) : (
-                    <div className="bg-muted/10 p-4 border border-border/40 rounded-xl text-xs font-semibold text-muted-foreground text-center">
-                      Full payment of <strong className="text-primary font-black">₹{calculateFinalAmount()}</strong> will be logged via <strong className="uppercase">{paymentMode}</strong>.
-                    </div>
-                  )}
 
-                  {/* Verify Split Sum Banner */}
-                  {paymentMode === 'Split' && (
-                    <div className="p-3 bg-emerald-50 border border-emerald-150 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-1.5 justify-center">
-                      <Check className="h-4 w-4 text-emerald-600" />
-                      <span>Split matches final bill exactly: ₹{upiSplitAmount} + ₹{cashSplitAmount} = ₹{calculateFinalAmount()}</span>
-                    </div>
-                  )}
+                    {/* Split payment inputs */}
+                    {paymentMode === 'Split' ? (
+                      <div className="grid grid-cols-2 gap-4 bg-muted/20 rounded-xl p-4 border border-border/50">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">UPI Split Amount (₹)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={calculateFinalAmount()}
+                            value={upiSplitAmount}
+                            onChange={(e) => handleUpiSplitChange(e.target.value)}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="w-full px-3 py-2 bg-card border border-border rounded-xl text-[16px] sm:text-xs font-bold text-foreground focus:outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cash Split Amount (₹)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={calculateFinalAmount()}
+                            value={cashSplitAmount}
+                            onChange={(e) => handleCashSplitChange(e.target.value)}
+                            onWheel={(e) => e.currentTarget.blur()}
+                            className="w-full px-3 py-2 bg-card border border-border rounded-xl text-[16px] sm:text-xs font-bold text-foreground focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-muted/10 p-4 border border-border/40 rounded-xl text-xs font-semibold text-muted-foreground text-center">
+                        Full payment of <strong className="text-primary font-black">₹{calculateFinalAmount()}</strong> will be logged via <strong className="uppercase">{paymentMode}</strong>.
+                      </div>
+                    )}
 
-                  {/* Wizard Step 4 Footer */}
+                    {/* Verify Split Sum Banner */}
+                    {paymentMode === 'Split' && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-150 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-1.5 justify-center">
+                        <Check className="h-4 w-4 text-emerald-600" />
+                        <span>Split matches bill: ₹{upiSplitAmount} + ₹{cashSplitAmount} = ₹{calculateFinalAmount()}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Wizard Step 5 Footer */}
                   <div className="flex items-center gap-3 pt-4 border-t border-border/60 justify-between shrink-0">
                     <button
                       type="button"
-                      onClick={() => setWizardStep(3)}
+                      onClick={() => setWizardStep(4)}
                       className="py-2.5 px-6 border border-border bg-card hover:bg-muted rounded-xl text-xs font-bold text-muted-foreground cursor-pointer"
                     >
                       Back
@@ -2031,48 +2141,50 @@ function BookingsContent() {
                 </div>
               )}
 
-              {/* STEP 5: BOOKING SUCCESS SCREEN */}
-              {wizardStep === 5 && bookingSuccessData && (
-                <div className="space-y-6 py-4 flex flex-col items-center justify-center text-center">
-                  <div className="w-40 h-40 flex items-center justify-center">
-                    <DotLottieReact
-                      src="https://lottie.host/a4743664-bf1a-4e8b-bffb-e7aa229e12be/TK33CGxBKq.lottie"
-                      loop
-                      autoplay
-                    />
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <h3 className="font-extrabold text-lg text-emerald-800 tracking-tight">Booking Confirmed Successfully!</h3>
-                    <p className="text-[11px] text-muted-foreground font-semibold">The slots are locked and payments are successfully registered.</p>
+              {/* STEP 6: BOOKING SUCCESS SCREEN */}
+              {wizardStep === 6 && bookingSuccessData && (
+                <div className="space-y-5 py-2 flex flex-col items-center justify-between flex-1 h-full">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 flex items-center justify-center">
+                      <DotLottieReact
+                        src="https://lottie.host/a4743664-bf1a-4e8b-bffb-e7aa229e12be/TK33CGxBKq.lottie"
+                        loop
+                        autoplay
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <h3 className="font-extrabold text-sm sm:text-base text-emerald-800 tracking-tight">Booking Confirmed Successfully!</h3>
+                      <p className="text-[9px] sm:text-[10px] text-muted-foreground font-semibold">The slots are locked and payments are successfully registered.</p>
+                    </div>
                   </div>
 
                   {/* Confirmation details */}
-                  <div className="bg-muted/15 border border-border/80 p-5 rounded-2xl text-left w-full space-y-4 max-w-md mx-auto">
-                    <div className="flex justify-between border-b border-border/40 pb-2">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Customer</span>
+                  <div className="bg-muted/15 border border-border/80 p-3 sm:p-4 rounded-xl text-left w-full space-y-2 max-w-md mx-auto">
+                    <div className="flex justify-between border-b border-border/40 pb-1.5">
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase">Customer</span>
                       <span className="text-xs font-bold text-foreground">{bookingSuccessData.customerName} ({bookingSuccessData.customerPhone})</span>
                     </div>
-                    <div className="flex justify-between border-b border-border/40 pb-2">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Turf Box</span>
+                    <div className="flex justify-between border-b border-border/40 pb-1.5">
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase">Turf Box</span>
                       <span className="text-xs font-bold text-foreground">{bookingSuccessData.groundName}</span>
                     </div>
-                    <div className="flex justify-between border-b border-border/40 pb-2">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Date</span>
+                    <div className="flex justify-between border-b border-border/40 pb-1.5">
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase">Date</span>
                       <span className="text-xs font-bold text-foreground font-mono">{bookingSuccessData.date}</span>
                     </div>
-                    <div className="flex justify-between border-b border-border/40 pb-2">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Booked Slots</span>
+                    <div className="flex justify-between border-b border-border/40 pb-1.5">
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase">Booked Slots</span>
                       <span className="text-[10px] font-bold text-foreground font-mono max-w-[200px] text-right truncate">
                         {bookingSuccessData.slots.map(s => formatSingleHourAMPM(s)).join(', ')}
                       </span>
                     </div>
-                    <div className="flex justify-between border-b border-border/40 pb-2">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Payment Details</span>
+                    <div className="flex justify-between border-b border-border/40 pb-1.5">
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase">Payment Details</span>
                       <span className="text-xs font-bold text-primary font-sans">{bookingSuccessData.paymentSummary}</span>
                     </div>
-                    <div className="flex justify-between pt-1">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Reference ID(s)</span>
+                    <div className="flex justify-between pt-0.5">
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase">Reference ID(s)</span>
                       <span className="text-[8px] font-bold font-mono text-muted-foreground truncate max-w-[180px]">
                         {bookingSuccessData.bookingIds.join(', ')}
                       </span>
