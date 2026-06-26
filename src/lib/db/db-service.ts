@@ -4,29 +4,7 @@ import * as mockDb from './mock-db';
 import { Ground, Customer, Booking, Payment, ActivityLog, PaymentStatus, User } from './types';
 
 // Hardcoded partners defined as fallback/direct accounts (bypassing Supabase SMTP limits)
-export const HARDCODED_PARTNERS: User[] = [
-  {
-    id: '93a86c6b-9c3f-4271-9c6f-c1fdf4d7fca1',
-    email: 'partner1@example.com',
-    phone: '9999999991',
-    role: 'partner',
-    created_at: '2026-06-26T06:00:00.000Z'
-  },
-  {
-    id: 'ad9e5590-db0e-4001-8bf7-df427e1f6e2a',
-    email: 'partner2@example.com',
-    phone: '9999999992',
-    role: 'partner',
-    created_at: '2026-06-26T06:00:00.000Z'
-  },
-  {
-    id: 'a3f01ab3-27e1-4c6e-bfbf-2b7e0129cd8a',
-    email: 'partner3@example.com',
-    phone: '9999999993',
-    role: 'partner',
-    created_at: '2026-06-26T06:00:00.000Z'
-  }
-];
+export const HARDCODED_PARTNERS: User[] = [];
 
 
 const normalizeTime = (t: string): string => {

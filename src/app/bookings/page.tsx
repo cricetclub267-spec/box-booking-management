@@ -500,6 +500,23 @@ function BookingsContent() {
     }
   };
 
+  const handlePhoneChange = (val: string) => {
+    const phoneVal = val.replace(/\D/g, '');
+    setFormCustPhone(phoneVal);
+    if (phoneVal.length === 10) {
+      const existing = customers.find(c => c.phone === phoneVal);
+      if (existing) {
+        setFormCustomerId(existing.id);
+        setFormCustName(existing.name);
+        setFormError(null);
+      } else {
+        setFormCustomerId('');
+      }
+    } else {
+      setFormCustomerId('');
+    }
+  };
+
   // Load everything
   const loadAllData = async (silent = false) => {
     if (!silent) {
@@ -1855,123 +1872,50 @@ function BookingsContent() {
                   <div className="space-y-5">
                     <div>
                       <h4 className="font-bold text-sm text-foreground">Customer Profile Details</h4>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Select an existing customer profile or enter details to register a new customer.</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Enter the customer's phone number to verify if they have an existing profile, or create a new one.</p>
                     </div>
 
-                    {/* Customer search query */}
-                    {!formCustomerId && (
-                      <div className="space-y-1.5 relative">
-                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Search Existing Customer</label>
-                        <input
-                          type="text"
-                          placeholder="Search by name or mobile number..."
-                          value={customerSearchQuery}
-                          onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-muted/20 border border-border rounded-xl text-[16px] sm:text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
-                        />
-                        
-                        {/* Dropdown list of filtered customers with Framer Motion Animation */}
-                        <AnimatePresence>
-                          {customerSearchQuery.trim() !== '' && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -4, scale: 0.95 }}
-                              animate={{ opacity: 1, y: 0, scale: 1 }}
-                              exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                              transition={{ duration: 0.12, ease: [0, 0, 0.2, 1] }}
-                              className="absolute z-50 w-full mt-1.5 bg-card border border-border rounded-xl shadow-2xl max-h-48 overflow-y-auto p-1.5 space-y-0.5"
-                            >
-                              {customers.filter(c => 
-                                c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-                                c.phone.includes(customerSearchQuery)
-                              ).length > 0 ? (
-                                customers.filter(c => 
-                                  c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-                                  c.phone.includes(customerSearchQuery)
-                                ).map(c => (
-                                  <button
-                                    key={c.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setFormCustomerId(c.id);
-                                      setFormCustName(c.name);
-                                      setFormCustPhone(c.phone);
-                                      setCustomerSearchQuery('');
-                                      setFormError(null);
-                                    }}
-                                    className="w-full text-left px-3 py-2.5 hover:bg-[#eef7f2] hover:text-[#0c4a28] rounded-lg transition-colors text-xs font-bold flex items-center justify-between cursor-pointer focus:outline-none focus:bg-[#eef7f2] focus:text-[#0c4a28]"
-                                  >
-                                    <span>{c.name}</span>
-                                    <span className="text-[10px] text-muted-foreground font-mono">{c.phone}</span>
-                                  </button>
-                                ))
-                              ) : (
-                                <div className="px-4 py-3 text-xs text-muted-foreground text-center font-bold">
-                                  No matching customers found. Register as a new customer below.
-                                </div>
-                              )}
-                            </motion.div>
+                    <div className="space-y-4">
+                      <div className="bg-muted/10 p-5 border border-border/80 rounded-2xl space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-md uppercase">
+                            {formCustomerId ? 'Existing Customer Profile' : 'New Customer Profile'}
+                          </span>
+                          {formCustomerId && (
+                            <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                              <Check className="h-3 w-3 shrink-0" /> Saved Profile Found
+                            </span>
                           )}
-                        </AnimatePresence>
-                      </div>
-                    )}
+                        </div>
 
-                    {/* Customer details display */}
-                    {formCustomerId ? (
-                      <div className="bg-accent/40 rounded-xl p-4 border border-primary/10 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 bg-primary/10 text-primary border border-primary/20 rounded-xl flex items-center justify-center font-bold text-sm">
-                            {formCustName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                          {/* Mobile Phone Input - First */}
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Mobile Phone</label>
+                            <input
+                              type="text"
+                              maxLength={10}
+                              placeholder="9876543210"
+                              value={formCustPhone}
+                              onChange={(e) => handlePhoneChange(e.target.value)}
+                              className="w-full px-3.5 py-2.5 bg-card border border-border rounded-xl text-[16px] sm:text-xs font-semibold font-mono focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            />
                           </div>
-                          <div>
-                            <h4 className="font-bold text-xs text-foreground flex items-center gap-1.5">
-                              {formCustName}
-                              <span className="text-[9px] font-bold bg-primary/15 text-primary px-1.5 py-0.5 rounded-md uppercase">Saved Profile</span>
-                            </h4>
-                            <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{formCustPhone}</p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormCustomerId('');
-                            setFormCustName('');
-                            setFormCustPhone('');
-                          }}
-                          className="py-1.5 px-3 border border-border bg-card hover:bg-muted text-red-650 font-bold rounded-xl text-[10px] transition-all cursor-pointer"
-                        >
-                          Change Customer
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="bg-muted/10 p-4 border border-border/80 rounded-2xl space-y-4">
-                          <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-1 rounded-md uppercase">New Customer Details</span>
-                          <div className="grid grid-cols-2 gap-4 pt-1">
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Customer Name</label>
-                              <input
-                                type="text"
-                                placeholder="Sachin Tendulkar"
-                                value={formCustName}
-                                onChange={(e) => setFormCustName(e.target.value)}
-                                className="w-full px-3 py-2 bg-card border border-border rounded-xl text-[16px] sm:text-xs font-semibold focus:outline-none"
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Mobile Phone</label>
-                              <input
-                                type="text"
-                                maxLength={10}
-                                placeholder="9876543210"
-                                value={formCustPhone}
-                                onChange={(e) => setFormCustPhone(e.target.value.replace(/\D/g, ''))}
-                                className="w-full px-3 py-2 bg-card border border-border rounded-xl text-[16px] sm:text-xs font-semibold font-mono focus:outline-none"
-                              />
-                            </div>
+
+                          {/* Customer Name Input - Second */}
+                          <div className="space-y-1.5">
+                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Customer Name</label>
+                            <input
+                              type="text"
+                              placeholder="Sachin Tendulkar"
+                              value={formCustName}
+                              onChange={(e) => setFormCustName(e.target.value)}
+                              className="w-full px-3.5 py-2.5 bg-card border border-border rounded-xl text-[16px] sm:text-xs font-semibold focus:outline-none"
+                            />
                           </div>
                         </div>
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   {/* Wizard Step 1 Footer */}

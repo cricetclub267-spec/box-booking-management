@@ -86,9 +86,13 @@ export default function DashboardPage() {
         const p = await getPayments();
         const l = await getActivityLogs();
 
+        // Filter out payments for deleted/cancelled bookings
+        const activeBookingIds = new Set(b.filter(book => book.status !== 'Cancelled').map(book => book.id));
+        const activePayments = p.filter(pay => activeBookingIds.has(pay.booking_id));
+
         setBookings(b);
         setCustomers(c);
-        setPayments(p);
+        setPayments(activePayments);
         setLogs(l);
 
         // 1. Calculations
@@ -100,18 +104,18 @@ export default function DashboardPage() {
         const todayB = b.filter(book => book.booking_date === todayStr && book.status !== 'Cancelled');
         
         // Today's Revenue (payments logged today)
-        const todayR = p.filter(pay => getLocalFormattedDateFromTimestamp(pay.payment_date) === todayStr)
+        const todayR = activePayments.filter(pay => getLocalFormattedDateFromTimestamp(pay.payment_date) === todayStr)
                         .reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
 
         // Monthly Revenue (payments logged this month)
-        const monthR = p.filter(pay => {
+        const monthR = activePayments.filter(pay => {
           const payDate = new Date(pay.payment_date);
           return payDate.getMonth() === currentMonth && payDate.getFullYear() === currentYear;
         }).reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
 
         // Pending Payments (calculated in memory to avoid N+1 queries)
         const paymentsByBooking: Record<string, number> = {};
-        for (const pay of p) {
+        for (const pay of activePayments) {
           paymentsByBooking[pay.booking_id] = (paymentsByBooking[pay.booking_id] || 0) + Number(pay.amount_paid);
         }
         let totalDues = 0;
@@ -138,7 +142,7 @@ export default function DashboardPage() {
           const label = d.toLocaleDateString(undefined, { weekday: 'short' });
 
           const dailyBookingsCount = b.filter(book => book.booking_date === dateStr && book.status !== 'Cancelled').length;
-          const dailyPaymentsCollected = p.filter(pay => getLocalFormattedDateFromTimestamp(pay.payment_date) === dateStr)
+          const dailyPaymentsCollected = activePayments.filter(pay => getLocalFormattedDateFromTimestamp(pay.payment_date) === dateStr)
                                           .reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
 
           trend.push({

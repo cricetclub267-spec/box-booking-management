@@ -95,7 +95,9 @@ export default function ReportsPage() {
   const getFilteredPayments = () => {
     return payments.filter(p => {
       const pDate = getLocalFormattedDateFromTimestamp(p.payment_date);
-      return (!startDate || pDate >= startDate) && (!endDate || pDate <= endDate);
+      const parentBooking = bookings.find(b => b.id === p.booking_id);
+      const isBookingActive = parentBooking && parentBooking.status !== 'Cancelled';
+      return (!startDate || pDate >= startDate) && (!endDate || pDate <= endDate) && isBookingActive;
     });
   };
 

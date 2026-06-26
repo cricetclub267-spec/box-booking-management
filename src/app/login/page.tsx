@@ -166,19 +166,11 @@ export default function LoginPage() {
       }
 
       // 1.1 Direct partner login check (Bypass Supabase SMTP limitation)
-      const partnerCredentials: Record<string, string> = {
-        '9999999991': 'Partner1Pass@123', // partner1@example.com
-        '9999999992': 'Partner2Pass@123', // partner2@example.com
-        '9999999993': 'Partner3Pass@123', // partner3@example.com
-      };
+      const partnerCredentials: Record<string, string> = {};
 
       const expectedPassword = partnerCredentials[sanitizedPhone];
       if (expectedPassword && sanitizedPassword === expectedPassword) {
-        const partnerEmails: Record<string, string> = {
-          '9999999991': 'partner1@example.com',
-          '9999999992': 'partner2@example.com',
-          '9999999993': 'partner3@example.com',
-        };
+        const partnerEmails: Record<string, string> = {};
         const email = partnerEmails[sanitizedPhone];
         login(email, 'partner');
         await logActivity('Partner logged in (Direct credentials)', email);
