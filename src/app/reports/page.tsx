@@ -28,6 +28,18 @@ import {
   ArrowDownCircle
 } from 'lucide-react';
 
+const getLocalFormattedDate = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getLocalFormattedDateFromTimestamp = (timestampStr: string) => {
+  if (!timestampStr) return '';
+  return getLocalFormattedDate(new Date(timestampStr));
+};
+
 export default function ReportsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -44,8 +56,8 @@ export default function ReportsPage() {
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
     
-    setStartDate(firstDay.toISOString().split('T')[0]);
-    setEndDate(today.toISOString().split('T')[0]);
+    setStartDate(getLocalFormattedDate(firstDay));
+    setEndDate(getLocalFormattedDate(today));
   }, []);
 
   const loadData = async () => {
@@ -85,7 +97,7 @@ export default function ReportsPage() {
 
   const getFilteredPayments = () => {
     return payments.filter(p => {
-      const pDate = p.payment_date.split('T')[0];
+      const pDate = getLocalFormattedDateFromTimestamp(p.payment_date);
       return (!startDate || pDate >= startDate) && (!endDate || pDate <= endDate);
     });
   };

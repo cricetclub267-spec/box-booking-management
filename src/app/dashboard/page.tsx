@@ -44,6 +44,18 @@ const BookingsChart = dynamic(() => import('@/components/dashboard/bookings-char
   )
 });
 
+const getLocalFormattedDate = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getLocalFormattedDateFromTimestamp = (timestampStr: string) => {
+  if (!timestampStr) return '';
+  return getLocalFormattedDate(new Date(timestampStr));
+};
+
 export default function DashboardPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -78,7 +90,7 @@ export default function DashboardPage() {
         setLogs(l);
 
         // 1. Calculations
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getLocalFormattedDate(new Date());
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
 
@@ -86,7 +98,7 @@ export default function DashboardPage() {
         const todayB = b.filter(book => book.booking_date === todayStr && book.status !== 'Cancelled');
         
         // Today's Revenue (payments logged today)
-        const todayR = p.filter(pay => pay.payment_date.split('T')[0] === todayStr)
+        const todayR = p.filter(pay => getLocalFormattedDateFromTimestamp(pay.payment_date) === todayStr)
                         .reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
 
         // Monthly Revenue (payments logged this month)
@@ -115,11 +127,11 @@ export default function DashboardPage() {
         for (let i = 6; i >= 0; i--) {
           const d = new Date();
           d.setDate(d.getDate() - i);
-          const dateStr = d.toISOString().split('T')[0];
+          const dateStr = getLocalFormattedDate(d);
           const label = d.toLocaleDateString(undefined, { weekday: 'short' });
 
           const dailyBookingsCount = b.filter(book => book.booking_date === dateStr && book.status !== 'Cancelled').length;
-          const dailyPaymentsCollected = p.filter(pay => pay.payment_date.split('T')[0] === dateStr)
+          const dailyPaymentsCollected = p.filter(pay => getLocalFormattedDateFromTimestamp(pay.payment_date) === dateStr)
                                           .reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
 
           trend.push({
@@ -310,11 +322,11 @@ export default function DashboardPage() {
                   <div className="py-8 flex justify-center">
                     <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                   </div>
-                ) : bookings.filter(b => b.booking_date === new Date().toISOString().split('T')[0] && b.status !== 'Cancelled').length === 0 ? (
+                ) : bookings.filter(b => b.booking_date === getLocalFormattedDate(new Date()) && b.status !== 'Cancelled').length === 0 ? (
                   <p className="text-xs text-muted-foreground italic py-6 text-center">No matches scheduled today.</p>
                 ) : (
                   bookings
-                    .filter(b => b.booking_date === new Date().toISOString().split('T')[0] && b.status !== 'Cancelled')
+                    .filter(b => b.booking_date === getLocalFormattedDate(new Date()) && b.status !== 'Cancelled')
                     .slice(0, 3)
                     .map(b => (
                       <div key={b.id} className="flex items-center justify-between p-2.5 border border-border/60 bg-muted/20 rounded-xl text-xs font-semibold">

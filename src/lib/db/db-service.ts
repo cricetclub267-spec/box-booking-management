@@ -3,6 +3,11 @@ import { hasSupabaseCredentials, supabase } from './supabase';
 import * as mockDb from './mock-db';
 import { Ground, Customer, Booking, Payment, ActivityLog, PaymentStatus, User } from './types';
 
+const normalizeTime = (t: string): string => {
+  if (!t) return '';
+  return t.substring(0, 5);
+};
+
 // Helper to determine if we should use Supabase or fallback to mock local database
 const useSupabase = (): boolean => {
   return hasSupabaseCredentials() && supabase !== null;
@@ -215,7 +220,11 @@ export const createBooking = async (
       console.error('Conflict check query failed:', conflictError);
     } else if (conflicts && conflicts.length > 0) {
       const overlap = conflicts.some(b => {
-        return bookingData.start_time < b.end_time && bookingData.end_time > b.start_time;
+        const bStart = normalizeTime(b.start_time);
+        const bEnd = normalizeTime(b.end_time);
+        const reqStart = normalizeTime(bookingData.start_time);
+        const reqEnd = normalizeTime(bookingData.end_time);
+        return reqStart < bEnd && reqEnd > bStart;
       });
       if (overlap) {
         throw new Error('This time slot is already booked for this ground. Double bookings are not allowed.');
@@ -267,7 +276,11 @@ export const updateBooking = async (
 
     if (conflicts && conflicts.length > 0) {
       const overlap = conflicts.some(b => {
-        return updatedBooking.start_time < b.end_time && updatedBooking.end_time > b.start_time;
+        const bStart = normalizeTime(b.start_time);
+        const bEnd = normalizeTime(b.end_time);
+        const reqStart = normalizeTime(updatedBooking.start_time);
+        const reqEnd = normalizeTime(updatedBooking.end_time);
+        return reqStart < bEnd && reqEnd > bStart;
       });
       if (overlap) {
         throw new Error('This time slot is already booked for this ground. Double bookings are not allowed.');

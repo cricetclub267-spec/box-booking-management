@@ -395,13 +395,16 @@ function BookingsContent() {
     const nextHourStr = `${(hour + 1).toString().padStart(2, '0')}:00`;
     const slotEnd = nextHourStr;
     
+    const reqStart = normalizeTime(slotStart);
+    const reqEnd = normalizeTime(slotEnd);
+    
     return bookings.some(b => 
       b.ground_id === groundId && 
       b.booking_date === dateStr && 
       b.status !== 'Cancelled' && 
       b.id !== editBookingId &&
-      slotStart < b.end_time && 
-      slotEnd > b.start_time
+      reqStart < normalizeTime(b.end_time) && 
+      reqEnd > normalizeTime(b.start_time)
     );
   };
 
@@ -538,9 +541,18 @@ function BookingsContent() {
     }
   }, [searchParams, bookings, router]);
 
+  // Helper to normalize time format to HH:MM
+  const normalizeTime = (t: string): string => {
+    if (!t) return '';
+    return t.substring(0, 5);
+  };
+
   // Format Date helpers
   const getFormattedDate = (date: Date) => {
-    return date.toISOString().split('T')[0];
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   };
 
   const handlePrevDate = () => {
@@ -805,6 +817,7 @@ function BookingsContent() {
     setCashSplitAmount('0');
     setCustomerSearchQuery('');
     setBookingSuccessData(null);
+    setFormError(null);
     
     const today = new Date();
     setCalendarYear(today.getFullYear());
@@ -912,12 +925,13 @@ function BookingsContent() {
 
   // Helper: Find booking for date, ground, and slot
   const getBookingForSlot = (groundId: string, date: string, slotTime: string) => {
+    const normSlot = normalizeTime(slotTime);
     return bookings.find(b => 
       b.ground_id === groundId && 
       b.booking_date === date && 
       b.status !== 'Cancelled' && 
-      slotTime >= b.start_time && 
-      slotTime < b.end_time
+      normSlot >= normalizeTime(b.start_time) && 
+      normSlot < normalizeTime(b.end_time)
     );
   };
 
@@ -1591,10 +1605,19 @@ function BookingsContent() {
 
             {/* Error banner */}
             {formError && (
-              <div className="px-6 pt-4 shrink-0">
-                <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs font-semibold rounded-xl flex items-start gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
-                  <span>{formError}</span>
+              <div className="px-6 pt-4 shrink-0 animate-fade-in">
+                <div className="p-3 bg-red-50 border border-red-200 text-red-855 text-xs font-semibold rounded-xl flex items-start justify-between gap-2 shadow-sm">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                    <span>{formError}</span>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setFormError(null)}
+                    className="p-0.5 hover:bg-red-100 rounded text-red-600 transition-colors cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
             )}
@@ -1834,7 +1857,10 @@ function BookingsContent() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setWizardStep(1)}
+                        onClick={() => {
+                          setFormError(null);
+                          setWizardStep(1);
+                        }}
                         className="py-2.5 px-6 border border-border bg-card hover:bg-muted rounded-xl text-xs font-bold text-muted-foreground cursor-pointer"
                       >
                         Back
@@ -1965,7 +1991,10 @@ function BookingsContent() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setWizardStep(2)}
+                        onClick={() => {
+                          setFormError(null);
+                          setWizardStep(2);
+                        }}
                         className="py-2.5 px-6 border border-border bg-card hover:bg-muted rounded-xl text-xs font-bold text-muted-foreground cursor-pointer"
                       >
                         Back
@@ -2071,7 +2100,10 @@ function BookingsContent() {
                   <div className="flex items-center gap-3 pt-4 border-t border-border/60 justify-between shrink-0">
                     <button
                       type="button"
-                      onClick={() => setWizardStep(3)}
+                      onClick={() => {
+                        setFormError(null);
+                        setWizardStep(3);
+                      }}
                       className="py-2.5 px-6 border border-border bg-card hover:bg-muted rounded-xl text-xs font-bold text-muted-foreground cursor-pointer"
                     >
                       Back
@@ -2187,7 +2219,10 @@ function BookingsContent() {
                   <div className="flex items-center gap-3 pt-4 border-t border-border/60 justify-between shrink-0">
                     <button
                       type="button"
-                      onClick={() => setWizardStep(4)}
+                      onClick={() => {
+                        setFormError(null);
+                        setWizardStep(4);
+                      }}
                       className="py-2.5 px-6 border border-border bg-card hover:bg-muted rounded-xl text-xs font-bold text-muted-foreground cursor-pointer"
                     >
                       Back

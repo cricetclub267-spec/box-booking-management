@@ -206,6 +206,12 @@ export const createCustomer = (name: string, phone: string): Customer => {
   return newCustomer;
 };
 
+// Helper to normalize time format to HH:MM
+const normalizeTime = (t: string): string => {
+  if (!t) return '';
+  return t.substring(0, 5);
+};
+
 // Time conflict verification
 export const checkTimeConflict = (
   groundId: string,
@@ -224,9 +230,14 @@ export const checkTimeConflict = (
     b.id !== excludeBookingId
   );
   
+  const reqStart = normalizeTime(startTime);
+  const reqEnd = normalizeTime(endTime);
+  
   // Overlap condition: startA < endB AND endA > startB
   const conflict = activeBookings.some(b => {
-    return startTime < b.end_time && endTime > b.start_time;
+    const bStart = normalizeTime(b.start_time);
+    const bEnd = normalizeTime(b.end_time);
+    return reqStart < bEnd && reqEnd > bStart;
   });
   
   return conflict;
