@@ -23,6 +23,7 @@ import {
   Plus
 } from 'lucide-react';
 import Link from 'next/link';
+import { useToastStore } from '@/lib/store/toast-store';
 
 import dynamic from 'next/dynamic';
 
@@ -57,6 +58,7 @@ const getLocalFormattedDateFromTimestamp = (timestampStr: string) => {
 };
 
 export default function DashboardPage() {
+  const { showToast } = useToastStore();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -142,8 +144,9 @@ export default function DashboardPage() {
         }
         setChartData(trend);
 
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error loading dashboard stats:', err);
+        showToast(`Database error: ${err.message || err}`, 'error');
       } finally {
         setLoading(false);
       }

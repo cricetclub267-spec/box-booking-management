@@ -528,8 +528,9 @@ function BookingsContent() {
       if (g.length > 0 && !formGroundId) {
         setFormGroundId(g[0].id);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      showToast(`Database error: ${e.message || e}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -2001,7 +2002,7 @@ function BookingsContent() {
                       <div className="grid grid-cols-2 gap-4">
                         {grounds.map((g, idx) => {
                           const isSelected = formGroundId === g.id;
-                          const boxName = idx === 0 ? 'Box 1 (Premium Turf)' : 'Box 2 (Premium Turf)';
+                          const boxName = g.name;
                           return (
                             <button
                               key={g.id}
@@ -2100,7 +2101,7 @@ function BookingsContent() {
                     <div className="bg-[#0c4a28]/10 border border-[#0c4a28]/20 rounded-2xl p-4 flex justify-between items-center text-xs">
                       <div>
                         <span className="text-[10px] font-bold text-muted-foreground uppercase block">Selected Turf</span>
-                        <span className="font-extrabold text-foreground">{formGroundId === grounds[0]?.id ? 'Box 1 (Premium Turf)' : 'Box 2 (Premium Turf)'}</span>
+                        <span className="font-extrabold text-foreground">{grounds.find(g => g.id === formGroundId)?.name || 'Selected Turf'}</span>
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] font-bold text-muted-foreground uppercase block">Selected Date</span>
@@ -2123,6 +2124,11 @@ function BookingsContent() {
                           const isSelected = selectedSlots.includes(slot);
                           const price = getSlotPrice(formGroundId, formDate, slot);
                           const displayTime = formatSlotTimeOnly(slot);
+
+                          const otherGroundsBooked = grounds
+                            .filter(g => g.id !== formGroundId)
+                            .filter(g => isSlotBooked(g.id, formDate, slot));
+                          const otherBookedNames = otherGroundsBooked.map(g => g.name.split(' ')[0]).join(', ');
 
                           if (isBooked) {
                             return (
@@ -2177,6 +2183,15 @@ function BookingsContent() {
                             >
                               <span>{displayTime}</span>
                               <span className={isSelected ? 'text-[#0c4a28] font-black' : 'text-emerald-400 font-semibold'}>₹{price}</span>
+                              {otherGroundsBooked.length > 0 && (
+                                <span className={`text-[8px] px-1 py-0.5 rounded font-extrabold mt-0.5 border ${
+                                  isSelected 
+                                    ? 'bg-amber-100 text-amber-900 border-amber-200' 
+                                    : 'bg-amber-950/40 text-amber-400 border-amber-900/40'
+                                }`}>
+                                  Booked in {otherBookedNames}
+                                </span>
+                              )}
                             </button>
                           );
                         })}
@@ -2243,7 +2258,7 @@ function BookingsContent() {
                       </div>
                       <div className="space-y-0.5">
                         <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Turf Box / Ground</span>
-                        <span className="text-xs font-bold text-foreground block">{formGroundId === grounds[0]?.id ? 'Box 1 (Premium Turf)' : 'Box 2 (Premium Turf)'}</span>
+                        <span className="text-xs font-bold text-foreground block">{grounds.find(g => g.id === formGroundId)?.name || 'Selected Turf'}</span>
                       </div>
                       <div className="space-y-0.5">
                         <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Booking Date</span>

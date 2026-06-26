@@ -65,3 +65,15 @@ CREATE POLICY "Allow public select on activity_logs" ON activity_logs FOR SELECT
 CREATE POLICY "Allow public insert on activity_logs" ON activity_logs FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update on activity_logs" ON activity_logs FOR UPDATE USING (true);
 CREATE POLICY "Allow public delete on activity_logs" ON activity_logs FOR DELETE USING (true);
+
+-- Grant API access (usage) on the public schema and table privileges to anon, authenticated and service_role
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+
+-- Configure default privileges so any future tables/sequences/functions get these grants automatically
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+

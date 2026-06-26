@@ -6,6 +6,7 @@ import { getErrorMessage } from '@/lib/security';
 import { getGrounds, logActivity, getPartners, createUserProfile, getUserProfileByPhone, updateGroundsRate } from '@/lib/db/db-service';
 import { Ground, User } from '@/lib/db/types';
 import { useAuthStore } from '@/lib/store/auth-store';
+import { useToastStore } from '@/lib/store/toast-store';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Settings as SettingsIcon, 
@@ -25,6 +26,7 @@ import {
 
 export default function SettingsPage() {
   const { user } = useAuthStore();
+  const { showToast } = useToastStore();
   const [grounds, setGrounds] = useState<Ground[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -135,8 +137,9 @@ export default function SettingsPage() {
           setPartners(p);
           setPartnersLoading(false);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error(e);
+        showToast(`Database error: ${e.message || e}`, 'error');
       } finally {
         setLoading(false);
       }
