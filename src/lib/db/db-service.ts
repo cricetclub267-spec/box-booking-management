@@ -8,6 +8,29 @@ const useSupabase = (): boolean => {
   return hasSupabaseCredentials() && supabase !== null;
 };
 
+// Global database error handler to clean up expired Supabase sessions (401 errors)
+const handleDbError = (error: any) => {
+  if (!error) return;
+  console.error('Database query error:', error);
+  
+  const status = error.status || (error.statusText === 'Unauthorized' ? 401 : null);
+  const code = error.code;
+  const message = error.message || '';
+  
+  if (status === 401 || code === 'PGRST301' || message.includes('JWT') || message.includes('invalid claim')) {
+    console.warn('Session is invalid or expired. Logging out and clearing invalid tokens...');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('turf_session');
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      }
+      window.location.href = '/login?expired=true';
+    }
+  }
+};
+
 // 1. Grounds Services
 export const getGrounds = async (): Promise<Ground[]> => {
   if (useSupabase() && supabase) {
@@ -17,6 +40,7 @@ export const getGrounds = async (): Promise<Ground[]> => {
       .order('name');
     
     if (error) {
+      handleDbError(error);
       console.error('Supabase getGrounds error, falling back to mock:', error);
       return mockDb.getGrounds();
     }
@@ -65,6 +89,7 @@ export const getCustomers = async (): Promise<Customer[]> => {
       .order('name');
     
     if (error) {
+      handleDbError(error);
       console.error('Supabase getCustomers error, falling back to mock:', error);
       return mockDb.getCustomers();
     }
@@ -82,6 +107,10 @@ export const createCustomer = async (name: string, phone: string): Promise<Custo
       .eq('phone', phone)
       .maybeSingle();
 
+    if (checkError) {
+      handleDbError(checkError);
+    }
+
     if (existing) {
       return existing;
     }
@@ -93,6 +122,7 @@ export const createCustomer = async (name: string, phone: string): Promise<Custo
       .single();
 
     if (error) {
+      handleDbError(error);
       console.error('Supabase createCustomer error, falling back to mock:', error);
       return mockDb.createCustomer(name, phone);
     }
@@ -117,6 +147,7 @@ export const getBookings = async (): Promise<Booking[]> => {
       .order('booking_date', { ascending: false });
 
     if (error) {
+      handleDbError(error);
       console.error('Supabase getBookings error, falling back to mock:', error);
       return mockDb.getBookings();
     }
@@ -140,6 +171,7 @@ export const createBooking = async (
       .is('deleted_at', null);
 
     if (conflictError) {
+      handleDbError(conflictError);
       console.error('Conflict check query failed:', conflictError);
     } else if (conflicts && conflicts.length > 0) {
       const overlap = conflicts.some(b => {
@@ -158,6 +190,7 @@ export const createBooking = async (
       .single();
 
     if (error) {
+      handleDbError(error);
       console.error('Supabase createBooking error, falling back to mock:', error);
       return mockDb.createBooking(bookingData, userEmail);
     }
@@ -211,6 +244,7 @@ export const updateBooking = async (
       .single();
 
     if (error) {
+      handleDbError(error);
       console.error('Supabase updateBooking error, falling back to mock:', error);
       return mockDb.updateBooking(updatedBooking, userEmail);
     }
@@ -232,6 +266,7 @@ export const softDeleteBooking = async (
       .eq('id', bookingId);
 
     if (error) {
+      handleDbError(error);
       console.error('Supabase softDeleteBooking error, falling back to mock:', error);
       return mockDb.softDeleteBooking(bookingId, userEmail);
     }
@@ -251,6 +286,7 @@ export const getPayments = async (): Promise<Payment[]> => {
       .order('payment_date', { ascending: false });
 
     if (error) {
+      handleDbError(error);
       console.error('Supabase getPayments error, falling back to mock:', error);
       return mockDb.getPayments();
     }
@@ -266,13 +302,21 @@ export const getBookingPaymentSummary = async (bookingId: string) => {
       .select('amount_paid')
       .eq('booking_id', bookingId);
 
+    if (error) {
+      handleDbError(error);
+    }
+
     const totalPaid = payments ? payments.reduce((sum, p) => sum + Number(p.amount_paid), 0) : 0;
 
-    const { data: booking } = await supabase
+    const { data: booking, error: bookingError } = await supabase
       .from('bookings')
       .select('final_amount')
       .eq('id', bookingId)
       .single();
+
+    if (bookingError) {
+      handleDbError(bookingError);
+    }
 
     const finalAmount = booking ? Number(booking.final_amount) : 0;
     const pendingAmount = Math.max(0, finalAmount - totalPaid);
@@ -311,18 +355,23 @@ export const addPayment = async (
       .single();
 
     if (error) {
+      handleDbError(error);
       console.error('Supabase addPayment error, falling back to mock:', error);
       return mockDb.addPayment(paymentData, userEmail);
     }
 
     // Fetch booking details for logging
-    const { data: booking } = await supabase
+    const { data: booking, error: bookingLookupError } = await supabase
       .from('bookings')
       .select(`
         customer:customer_id (name)
       `)
       .eq('id', paymentData.booking_id)
       .single();
+
+    if (bookingLookupError) {
+      handleDbError(bookingLookupError);
+    }
 
     const customerName = (booking as any)?.customer?.name || 'Customer';
     await logActivity(`Received payment of ₹${paymentData.amount_paid} via ${paymentData.payment_method} from ${customerName}`, userEmail);
@@ -341,6 +390,7 @@ export const getActivityLogs = async (): Promise<ActivityLog[]> => {
       .order('created_at', { ascending: false });
 
     if (error) {
+      handleDbError(error);
       console.error('Supabase getActivityLogs error, falling back to mock:', error);
       return mockDb.getActivityLogs();
     }
@@ -356,6 +406,7 @@ export const logActivity = async (action: string, userEmail: string = 'dhameliya
       .insert([{ action, user_email: userEmail }]);
 
     if (error) {
+      handleDbError(error);
       console.error('Supabase logActivity error, falling back to mock:', error);
       mockDb.logActivity(action, userEmail);
     }
@@ -374,6 +425,7 @@ export const getUserProfileByPhone = async (phone: string): Promise<User | null>
       .maybeSingle();
       
     if (error) {
+      handleDbError(error);
       console.error('Supabase getUserProfileByPhone error, falling back to mock:', error);
       const mockUsers = mockDb.getUsers();
       return mockUsers.find(u => u.phone === phone) || null;
@@ -395,6 +447,7 @@ export const createUserProfile = async (
       .single();
 
     if (error) {
+      handleDbError(error);
       console.error('Supabase createUserProfile error, falling back to mock:', error);
       return mockDb.createUser(profile.email, profile.phone, profile.role, profile.id);
     }
@@ -412,6 +465,7 @@ export const getPartners = async (): Promise<User[]> => {
       .order('created_at', { ascending: false });
 
     if (error) {
+      handleDbError(error);
       console.error('Supabase getPartners error, falling back to mock:', error);
       const mockUsers = mockDb.getUsers();
       return mockUsers.filter(u => u.role === 'partner');

@@ -60,6 +60,16 @@ export default function LoginPage() {
   }, [initialize]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('expired') === 'true') {
+        showToast('Your session has expired or is invalid. Please login again.', 'error');
+        router.replace('/login');
+      }
+    }
+  }, [showToast, router]);
+
+  useEffect(() => {
     // If already logged in, redirect
     if (user) {
       router.push('/dashboard');
