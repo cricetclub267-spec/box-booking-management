@@ -573,7 +573,7 @@ function BookingsContent() {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleFocus);
       clearInterval(interval);
-      if (channel) {
+      if (channel && supabase) {
         supabase.removeChannel(channel);
       }
     };
