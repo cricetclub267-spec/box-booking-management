@@ -1152,12 +1152,27 @@ function BookingsContent() {
             className="grid bg-muted/20 border-b border-border/80 text-[10px] font-bold text-muted-foreground uppercase tracking-widest"
             style={{ gridTemplateColumns: `100px repeat(${activeGrounds.length}, 140px)` }}
           >
-            <div className="p-4 border-r border-border/80">Time</div>
-            {activeGrounds.map(g => (
-              <div key={g.id} className="p-4 text-center border-r border-border/80 last:border-r-0 font-bold">
-                {g.name} <span className="text-primary text-[9px] lowercase bg-accent px-1.5 py-0.5 rounded-md ml-1">₹{g.hourly_rate}/hr</span>
-              </div>
-            ))}
+            <div className="p-3 border-r border-border/80 flex items-center justify-center">Time</div>
+            {activeGrounds.map(g => {
+              const count = bookings.filter(
+                b => b.ground_id === g.id && 
+                b.booking_date === dateStr && 
+                b.status !== 'Cancelled'
+              ).length;
+              return (
+                <div key={g.id} className="p-3 text-center border-r border-border/80 last:border-r-0 font-bold flex flex-col items-center justify-center min-h-[60px]">
+                  <span className="truncate max-w-[130px]">{g.name}</span>
+                  <div className="flex items-center gap-1.5 mt-1 font-semibold normal-case">
+                    <span className="text-primary text-[9px] lowercase bg-accent px-1.5 py-0.5 rounded-md">₹{g.hourly_rate}/hr</span>
+                    {count > 0 && (
+                      <span className="bg-primary text-white text-[9px] px-1.5 py-0.5 rounded-md font-extrabold shadow-sm">
+                        {count} {count === 1 ? 'Booking' : 'Bookings'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Time Slots Grid */}
@@ -1295,13 +1310,26 @@ function BookingsContent() {
             className="grid bg-muted/20 border-b border-border/80 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-center"
             style={{ gridTemplateColumns: `80px repeat(7, 140px)` }}
           >
-            <div className="p-3 border-r border-border/80">Time</div>
+            <div className="p-3 border-r border-border/80 flex items-center justify-center">Time</div>
             {weekDates.map(date => {
               const isToday = date.toDateString() === new Date().toDateString();
+              const dateStr = getFormattedDate(date);
+              const count = bookings.filter(
+                b => b.ground_id === groundId && 
+                b.booking_date === dateStr && 
+                b.status !== 'Cancelled'
+              ).length;
               return (
-                <div key={date.toISOString()} className={`p-3 text-center border-r border-border/80 last:border-r-0 ${isToday ? 'bg-primary/5 text-primary font-extrabold' : ''}`}>
-                  <p>{date.toLocaleDateString('en-US', { weekday: 'short' })}</p>
-                  <p className="text-xs font-bold mt-0.5">{date.getDate()}</p>
+                <div key={date.toISOString()} className={`p-3 text-center border-r border-border/80 last:border-r-0 flex flex-col items-center justify-center min-h-[56px] ${isToday ? 'bg-primary/5 text-primary font-extrabold' : ''}`}>
+                  <p className="text-muted-foreground">{date.toLocaleDateString('en-US', { weekday: 'short' })}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5 normal-case font-semibold">
+                    <span className="text-xs font-bold">{date.getDate()}</span>
+                    {count > 0 && (
+                      <span className="bg-primary text-white text-[8px] px-1 py-0.5 rounded font-extrabold shadow-sm">
+                        {count} {count === 1 ? 'Booking' : 'Bookings'}
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -1551,7 +1579,7 @@ function BookingsContent() {
       </div>
 
       {/* Date Navigation Bar */}
-      <div className="bg-card border border-border/80 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+      <div className="bg-card border border-border/80 rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <button 
             onClick={handlePrevDate}
@@ -1573,12 +1601,35 @@ function BookingsContent() {
           </button>
         </div>
 
-        <h2 className="font-extrabold text-sm sm:text-md text-foreground flex items-center gap-2">
+        <h2 className="font-extrabold text-sm sm:text-md text-foreground flex items-center gap-2 justify-center">
           <CalendarIcon className="h-4.5 w-4.5 text-primary" />
           {currentViewTitle()}
         </h2>
 
-        <div className="w-[100px] hidden sm:block"></div> {/* Spacer */}
+        {/* Day View Bookings Summary in Header */}
+        {viewMode === 'day' ? (
+          <div className="flex flex-wrap gap-2 items-center justify-end">
+            {grounds.map(g => {
+              const dateStr = getFormattedDate(currentDate);
+              const count = bookings.filter(
+                b => b.ground_id === g.id && 
+                b.booking_date === dateStr && 
+                b.status !== 'Cancelled'
+              ).length;
+              return (
+                <div key={g.id} className="text-[10px] font-bold px-2.5 py-1 bg-muted border border-border/80 text-foreground rounded-xl flex items-center gap-1.5 shadow-sm">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary"></span>
+                  <span className="text-muted-foreground">{g.name.split(' (')[0]}:</span>
+                  <span className="text-foreground font-extrabold">
+                    {count}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="w-[100px] hidden md:block"></div>
+        )}
       </div>
 
       {/* Calendar Render */}
