@@ -60,15 +60,6 @@ export default function PaymentsPage() {
   const [balancesPage, setBalancesPage] = useState(1);
   const [receiptsPage, setReceiptsPage] = useState(1);
 
-  // Reset pages when filters change
-  useEffect(() => {
-    setBalancesPage(1);
-  }, [searchTerm, statusFilter, dateFilterType, selectedFilterDate]);
-
-  useEffect(() => {
-    setReceiptsPage(1);
-  }, [searchTerm, methodFilter, dateFilterType, selectedFilterDate]);
-
   // Date Filtering states
   const [dateFilterType, setDateFilterType] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all'>('today');
   const [selectedFilterDate, setSelectedFilterDate] = useState<string>('');
@@ -77,6 +68,15 @@ export default function PaymentsPage() {
   useEffect(() => {
     setSelectedFilterDate(getLocalFormattedDate(new Date()));
   }, []);
+
+  // Reset pages when filters change
+  useEffect(() => {
+    setBalancesPage(1);
+  }, [searchTerm, statusFilter, dateFilterType, selectedFilterDate]);
+
+  useEffect(() => {
+    setReceiptsPage(1);
+  }, [searchTerm, methodFilter, dateFilterType, selectedFilterDate]);
 
   // Log Payment Form
   const [showLogModal, setShowLogModal] = useState(false);
