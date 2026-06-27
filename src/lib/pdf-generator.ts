@@ -333,6 +333,12 @@ export const exportRevenueReportPDF = async (
     return sum + (summary ? summary.pendingAmount : 0);
   }, 0);
 
+  // Calculate UPI and Cash breakdown from paymentsList matching bookingsList
+  const filteredBookingIds = new Set(bookingsList.map(b => b.id));
+  const rangePayments = paymentsList.filter(p => filteredBookingIds.has(p.booking_id));
+  const upiCollected = rangePayments.filter(p => p.payment_method === 'UPI').reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  const cashCollected = rangePayments.filter(p => p.payment_method === 'Cash').reduce((sum, p) => sum + Number(p.amount_paid), 0);
+
   // Summary Metrics boxes
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
@@ -345,7 +351,7 @@ export const exportRevenueReportPDF = async (
     body: [[
       `Rs. ${totalRevenue.toLocaleString()}`,
       `Rs. ${totalDiscounts.toLocaleString()}`,
-      `Rs. ${totalCollected.toLocaleString()}`,
+      `Rs. ${totalCollected.toLocaleString()}\n(UPI: Rs. ${upiCollected.toLocaleString()}\nCash: Rs. ${cashCollected.toLocaleString()})`,
       `Rs. ${totalDues.toLocaleString()}`
     ]],
     headStyles: { 
@@ -448,6 +454,8 @@ export const exportPaymentsReportPDF = async (
   addPDFHeader(doc, `TRANSACTION RECEIPTS REPORT`, logoImg);
 
   const totalCollected = paymentsList.reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  const upiCollected = paymentsList.filter(p => p.payment_method === 'UPI').reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  const cashCollected = paymentsList.filter(p => p.payment_method === 'Cash').reduce((sum, p) => sum + Number(p.amount_paid), 0);
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
@@ -457,7 +465,7 @@ export const exportPaymentsReportPDF = async (
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(50, 50, 50);
   doc.text(`Total Transactions Count: ${paymentsList.length}`, 14, 60);
-  doc.text(`Total Volume Collected: Rs.${totalCollected.toLocaleString('en-IN')}`, 14, 65);
+  doc.text(`Total Volume Collected: Rs.${totalCollected.toLocaleString('en-IN')} (UPI: Rs.${upiCollected.toLocaleString('en-IN')}, Cash: Rs.${cashCollected.toLocaleString('en-IN')})`, 14, 65);
 
   const tableBody = paymentsList.map(p => {
     const booking = bookingsList.find(b => b.id === p.booking_id);

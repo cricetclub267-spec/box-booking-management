@@ -25,8 +25,15 @@ import {
   Clock, 
   CheckCircle,
   Database,
-  ArrowDownCircle
+  ArrowDownCircle,
+  ChevronDown
 } from 'lucide-react';
+import { 
+  DropdownMenu, 
+  DropdownMenuTrigger, 
+  DropdownMenuContent, 
+  DropdownMenuItem 
+} from '@/components/ui/dropdown-menu';
 
 const getLocalFormattedDate = (date: Date) => {
   const y = date.getFullYear();
@@ -50,6 +57,11 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedReportTab, setSelectedReportTab] = useState<'bookings' | 'revenue' | 'payments' | 'discounts'>('bookings');
+  const [methodFilter, setMethodFilter] = useState<string>('all');
+
+  useEffect(() => {
+    setMethodFilter('all');
+  }, [selectedReportTab]);
 
   // Initialize date range to current month
   useEffect(() => {
@@ -97,7 +109,9 @@ export default function ReportsPage() {
       const pDate = getLocalFormattedDateFromTimestamp(p.payment_date);
       const parentBooking = bookings.find(b => b.id === p.booking_id);
       const isBookingActive = parentBooking && parentBooking.status !== 'Cancelled';
-      return (!startDate || pDate >= startDate) && (!endDate || pDate <= endDate) && isBookingActive;
+      const matchesDate = (!startDate || pDate >= startDate) && (!endDate || pDate <= endDate);
+      const matchesMethod = methodFilter === 'all' || p.payment_method === methodFilter;
+      return matchesDate && matchesMethod && isBookingActive;
     });
   };
 
@@ -134,10 +148,25 @@ export default function ReportsPage() {
   const filteredPayments = getFilteredPayments();
   const filteredDiscounts = getFilteredDiscounts();
 
+  // We want the metrics cards to show the total overall payments for the date range, regardless of payment method filter
+  const overallCollectedPayments = payments.filter(p => {
+    const pDate = getLocalFormattedDateFromTimestamp(p.payment_date);
+    const parentBooking = bookings.find(b => b.id === p.booking_id);
+    const isBookingActive = parentBooking && parentBooking.status !== 'Cancelled';
+    return (!startDate || pDate >= startDate) && (!endDate || pDate <= endDate) && isBookingActive;
+  });
+
   const totalBillable = filteredBookings.reduce((sum, b) => sum + Number(b.final_amount), 0);
-  const totalCollected = filteredPayments.reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  const totalCollected = overallCollectedPayments.reduce((sum, p) => sum + Number(p.amount_paid), 0);
   const totalDues = Math.max(0, totalBillable - totalCollected);
   const totalDiscountAmount = filteredDiscounts.reduce((sum, b) => sum + Number(b.discount), 0);
+
+  const totalUPI = overallCollectedPayments
+    .filter(p => p.payment_method === 'UPI')
+    .reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  const totalCash = overallCollectedPayments
+    .filter(p => p.payment_method === 'Cash')
+    .reduce((sum, p) => sum + Number(p.amount_paid), 0);
 
   return (
     <DashboardLayout>
@@ -180,6 +209,27 @@ export default function ReportsPage() {
               align="end"
             />
           </div>
+
+          {selectedReportTab === 'payments' && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-semibold text-muted-foreground">Method:</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger>
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/20 border border-border rounded-xl text-xs font-semibold focus:outline-none cursor-pointer select-none">
+                    {methodFilter === 'all' ? 'All Methods' : methodFilter}
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-44" align="end">
+                  <DropdownMenuItem onClick={() => setMethodFilter('all')}>All Methods</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setMethodFilter('UPI')}>UPI</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setMethodFilter('Cash')}>Cash</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setMethodFilter('Card')}>Card</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setMethodFilter('Bank Transfer')}>Bank Transfer</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
 
         {/* Tab Buttons */}
@@ -209,6 +259,16 @@ export default function ReportsPage() {
           <div className="bg-card border border-border/80 rounded-2xl p-4.5 shadow-sm">
             <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 w-fit block">Collected Volume</span>
             <span className="text-lg font-bold text-emerald-700 block mt-1">₹{totalCollected.toLocaleString('en-IN')}</span>
+            <div className="mt-2 pt-2 border-t border-border/60 flex items-center justify-between text-[10px]">
+              <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                UPI: <strong className="text-foreground">₹{totalUPI.toLocaleString('en-IN')}</strong>
+              </span>
+              <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                Cash: <strong className="text-foreground">₹{totalCash.toLocaleString('en-IN')}</strong>
+              </span>
+            </div>
           </div>
 
           <div className="bg-card border border-border/80 rounded-2xl p-4.5 shadow-sm">

@@ -187,6 +187,16 @@ export default function PaymentsPage() {
     return sum + (bookingExists ? Number(p.amount_paid) : 0);
   }, 0);
 
+  const totalUPI = payments.reduce((sum, p) => {
+    const bookingExists = bookings.some(b => b.id === p.booking_id);
+    return sum + (bookingExists && p.payment_method === 'UPI' ? Number(p.amount_paid) : 0);
+  }, 0);
+
+  const totalCash = payments.reduce((sum, p) => {
+    const bookingExists = bookings.some(b => b.id === p.booking_id);
+    return sum + (bookingExists && p.payment_method === 'Cash' ? Number(p.amount_paid) : 0);
+  }, 0);
+
   const totalDiscounts = activeBookings.reduce((sum, b) => sum + Number(b.discount), 0);
 
   // Filtered Bookings (Balances tab)
@@ -315,6 +325,16 @@ export default function PaymentsPage() {
               <IndianRupee className="h-5 w-5 text-emerald-700 shrink-0" />
               <span className="text-xl font-bold text-emerald-700 leading-tight">
                 {totalCollected.toLocaleString('en-IN')}
+              </span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between text-[10px]">
+              <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                UPI: <strong className="text-foreground">₹{totalUPI.toLocaleString('en-IN')}</strong>
+              </span>
+              <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                Cash: <strong className="text-foreground">₹{totalCash.toLocaleString('en-IN')}</strong>
               </span>
             </div>
           </div>
@@ -620,7 +640,14 @@ export default function PaymentsPage() {
                 <p className="text-xs text-muted-foreground font-semibold">No transactions recorded yet.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+                <div className="px-5 py-2.5 bg-muted/10 border-b border-border/60 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground font-medium">
+                  <span>Showing {filteredReceipts.length} transactions</span>
+                  <span>
+                    Total Filtered Amount: <strong className="text-emerald-700">₹{filteredReceipts.reduce((sum, p) => sum + Number(p.amount_paid), 0).toLocaleString('en-IN')}</strong>
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
                 {/* Desktop View Table */}
                 <table className="w-full text-left border-collapse hidden sm:table">
                   <thead>
@@ -730,7 +757,8 @@ export default function PaymentsPage() {
                   })}
                 </div>
               </div>
-            )}
+            </>
+          )}
           </div>
         )}
 
