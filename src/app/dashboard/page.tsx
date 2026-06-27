@@ -7,9 +7,10 @@ import {
   getCustomers, 
   getPayments, 
   getActivityLogs, 
-  getBookingPaymentSummary 
+  getBookingPaymentSummary,
+  getExpenses 
 } from '@/lib/db/db-service';
-import { Booking, Payment, ActivityLog } from '@/lib/db/types';
+import { Booking, Payment, ActivityLog, Expense } from '@/lib/db/types';
 import { 
   CalendarDays, 
   IndianRupee, 
@@ -79,6 +80,7 @@ export default function DashboardPage() {
     todayBookings: 0,
     todayRevenue: 0,
     monthlyRevenue: 0,
+    monthlyExpenses: 0,
     pendingPayments: 0,
     totalCustomers: 0
   });
@@ -95,6 +97,14 @@ export default function DashboardPage() {
         const c = await getCustomers();
         const p = await getPayments();
         const l = await getActivityLogs();
+
+        // Load expenses (gracefully handle if table doesn't exist yet)
+        let allExpenses: Expense[] = [];
+        try {
+          allExpenses = await getExpenses();
+        } catch (err) {
+          console.warn('Could not load expenses:', err);
+        }
 
         // Filter out payments for deleted/cancelled bookings
         const activeBookingIds = new Set(b.filter(book => book.status !== 'Cancelled').map(book => book.id));
@@ -123,6 +133,12 @@ export default function DashboardPage() {
           return payDate.getMonth() === currentMonth && payDate.getFullYear() === currentYear;
         }).reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
 
+        // Monthly Expenses
+        const monthE = allExpenses.filter(exp => {
+          const expDate = new Date(exp.expense_date);
+          return expDate.getMonth() === currentMonth && expDate.getFullYear() === currentYear;
+        }).reduce((sum, exp) => sum + Number(exp.amount), 0);
+
         // Pending Payments (calculated in memory to avoid N+1 queries)
         const paymentsByBooking: Record<string, number> = {};
         for (const pay of activePayments) {
@@ -139,6 +155,7 @@ export default function DashboardPage() {
           todayBookings: todayB.length,
           todayRevenue: todayR,
           monthlyRevenue: monthR,
+          monthlyExpenses: monthE,
           pendingPayments: totalDues,
           totalCustomers: c.length
         });
@@ -206,8 +223,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Dynamic Metric Tiles */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {/* Card 1 */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* Card 1 - Today's Slots */}
           <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Today's Slots</span>
             <div className="flex items-baseline justify-between mt-3 text-left">
@@ -218,7 +235,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Card 2 */}
+          {/* Card 2 - Today's Revenue */}
           <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
             <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 w-fit block">Today's Revenue</span>
             <div className="flex items-baseline gap-0.5 mt-3 text-left">
@@ -229,7 +246,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Card 3 */}
+          {/* Card 3 - Monthly Gross Revenue */}
           <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
             <span className="text-[10px] font-bold text-primary bg-accent/60 px-2 py-0.5 rounded-lg border border-primary/10 w-fit block">Monthly Revenue</span>
             <div className="flex items-baseline gap-0.5 mt-3 text-left">
@@ -240,7 +257,18 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Card 4 */}
+          {/* Card 4 - Monthly Expenses */}
+          <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <span className="text-[10px] font-bold text-red-800 bg-red-50 px-2 py-0.5 rounded-lg border border-red-100 w-fit block">Monthly Expenses</span>
+            <div className="flex items-baseline gap-0.5 mt-3 text-left">
+              <IndianRupee className="h-5 w-5 text-red-600 shrink-0" />
+              <span className="text-2xl font-extrabold text-red-600 leading-tight">
+                {stats.monthlyExpenses.toLocaleString('en-IN')}
+              </span>
+            </div>
+          </div>
+
+          {/* Card 5 - Pending Dues */}
           <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
             <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100 w-fit block">Pending Dues</span>
             <div className="flex items-baseline gap-0.5 mt-3 text-left">
@@ -251,7 +279,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Card 5 */}
+          {/* Card 6 - Total Customers */}
           <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Total Customers</span>
             <div className="flex items-baseline justify-between mt-3 text-left">
