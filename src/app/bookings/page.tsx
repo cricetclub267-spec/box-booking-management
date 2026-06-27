@@ -1142,7 +1142,6 @@ function BookingsContent() {
 
   // Quick select time slots from cell click
   const handleCellClick = (groundId: string, date: string, hourSlot: string) => {
-    if (user?.role === 'partner') return; // Read-only
     resetBookingForm();
     setFormGroundId(groundId);
     setFormDate(date);
@@ -1587,20 +1586,18 @@ function BookingsContent() {
           </DropdownMenu>
 
           {/* Add Booking trigger */}
-          {user?.role !== 'partner' && (
-            <button
-              onClick={() => {
-                resetBookingForm();
-                // Set default date to calendar selected date
-                setFormDate(getFormattedDate(currentDate));
-                setShowAddModal(true);
-              }}
-              className="py-2 px-4 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-primary/10 transition-all active:scale-95"
-            >
-              <Plus className="h-4 w-4" />
-              Add Booking
-            </button>
-          )}
+          <button
+            onClick={() => {
+              resetBookingForm();
+              // Set default date to calendar selected date
+              setFormDate(getFormattedDate(currentDate));
+              setShowAddModal(true);
+            }}
+            className="py-2 px-4 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-primary/10 transition-all active:scale-95"
+          >
+            <Plus className="h-4 w-4" />
+            Add Booking
+          </button>
         </div>
       </div>
 

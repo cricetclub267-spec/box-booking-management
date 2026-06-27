@@ -37,6 +37,11 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [customersPage, setCustomersPage] = useState(1);
+
+  useEffect(() => {
+    setCustomersPage(1);
+  }, [searchTerm]);
   
   // Create Customer Form State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -155,6 +160,9 @@ export default function CustomersPage() {
     c.phone.includes(searchTerm)
   );
 
+  const ENTRIES_PER_PAGE = 10;
+  const paginatedCustomers = filteredCustomers.slice((customersPage - 1) * ENTRIES_PER_PAGE, customersPage * ENTRIES_PER_PAGE);
+
   const handleAddCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -192,15 +200,13 @@ export default function CustomersPage() {
             <h1 className="text-2xl font-bold text-foreground tracking-tight">Customer Directory</h1>
             <p className="text-xs text-muted-foreground mt-0.5">Manage customer profiles and lifetime value tracking</p>
           </div>
-          {user?.role === 'admin' && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="py-2.5 px-4 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-primary/10 transition-transform active:scale-95"
-            >
-              <Plus className="h-4 w-4" />
-              Add Customer
-            </button>
-          )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="py-2.5 px-4 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-primary/10 transition-transform active:scale-95"
+          >
+            <Plus className="h-4 w-4" />
+            Add Customer
+          </button>
         </div>
 
         {/* Search and Filters Bar */}
@@ -233,50 +239,99 @@ export default function CustomersPage() {
             <p className="text-xs text-muted-foreground mt-1">Try resetting your search filter or add a new customer profile.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredCustomers.map((cust) => (
-              <Link 
-                key={cust.id}
-                href={`/customers/${cust.id}`}
-                className="bg-card border border-border/80 rounded-2xl p-5 hover:border-primary/30 hover:shadow-md transition-all group flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="h-10 w-10 bg-accent text-primary rounded-xl flex items-center justify-center font-bold text-sm">
-                      {cust.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {paginatedCustomers.map((cust) => (
+                <Link 
+                  key={cust.id}
+                  href={`/customers/${cust.id}`}
+                  className="bg-card border border-border/80 rounded-2xl p-5 hover:border-primary/30 hover:shadow-md transition-all group flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="h-10 w-10 bg-accent text-primary rounded-xl flex items-center justify-center font-bold text-sm">
+                        {cust.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/60 transition-transform group-hover:translate-x-1" />
                     </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/60 transition-transform group-hover:translate-x-1" />
-                  </div>
-                  <h3 className="font-bold text-sm text-foreground mt-3 group-hover:text-primary transition-colors">{cust.name}</h3>
-                  
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2">
-                    <Phone className="h-3.5 w-3.5 text-muted-foreground/60" />
-                    <span>{cust.phone}</span>
+                    <h3 className="font-bold text-sm text-foreground mt-3 group-hover:text-primary transition-colors">{cust.name}</h3>
+                    
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2">
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground/60" />
+                      <span>{cust.phone}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 mt-1">
+                      <Calendar className="h-3.5 w-3.5 text-muted-foreground/40" />
+                      <span>Registered: {new Date(cust.created_at).toLocaleDateString()}</span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 mt-1">
-                    <Calendar className="h-3.5 w-3.5 text-muted-foreground/40" />
-                    <span>Registered: {new Date(cust.created_at).toLocaleDateString()}</span>
+                  <div className="grid grid-cols-2 gap-2 mt-5 pt-4 border-t border-border/50 text-left">
+                    <div>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Bookings</span>
+                      <span className="text-sm font-bold text-foreground mt-0.5 block">{cust.totalBookings}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Total Spent</span>
+                      <span className="text-sm font-bold text-primary flex items-center mt-0.5">
+                        <IndianRupee className="h-3 w-3" />
+                        {cust.totalRevenue.toLocaleString('en-IN')}
+                      </span>
+                    </div>
                   </div>
-                </div>
+                </Link>
+              ))}
+            </div>
 
-                <div className="grid grid-cols-2 gap-2 mt-5 pt-4 border-t border-border/50 text-left">
-                  <div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Bookings</span>
-                    <span className="text-sm font-bold text-foreground mt-0.5 block">{cust.totalBookings}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Total Spent</span>
-                    <span className="text-sm font-bold text-primary flex items-center mt-0.5">
-                      <IndianRupee className="h-3 w-3" />
-                      {cust.totalRevenue.toLocaleString('en-IN')}
-                    </span>
-                  </div>
+            {/* Pagination Controls */}
+            {filteredCustomers.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-4 border border-border bg-card rounded-2xl text-xs font-semibold gap-3 mt-4">
+                <span className="text-muted-foreground text-center sm:text-left">
+                  Showing <strong className="text-foreground">{(customersPage - 1) * ENTRIES_PER_PAGE + 1}</strong> to <strong className="text-foreground">{Math.min(customersPage * ENTRIES_PER_PAGE, filteredCustomers.length)}</strong> of <strong className="text-foreground">{filteredCustomers.length}</strong> entries
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setCustomersPage(prev => Math.max(prev - 1, 1))}
+                    disabled={customersPage === 1}
+                    className="px-3 py-1.5 border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all select-none cursor-pointer"
+                  >
+                    Previous
+                  </button>
+                  {Array.from({ length: Math.max(1, Math.ceil(filteredCustomers.length / ENTRIES_PER_PAGE)) }, (_, i) => i + 1)
+                    .filter(page => page === 1 || page === Math.max(1, Math.ceil(filteredCustomers.length / ENTRIES_PER_PAGE)) || Math.abs(page - customersPage) <= 1)
+                    .map((page, idx, arr) => {
+                      const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
+                      return (
+                        <React.Fragment key={page}>
+                          {showEllipsis && <span className="px-2 text-muted-foreground">...</span>}
+                          <button
+                            type="button"
+                            onClick={() => setCustomersPage(page)}
+                            className={`px-3 py-1.5 border rounded-lg transition-all select-none cursor-pointer ${
+                              customersPage === page
+                                ? 'bg-primary text-white border-primary shadow-sm'
+                                : 'border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+                  <button
+                    type="button"
+                    onClick={() => setCustomersPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(filteredCustomers.length / ENTRIES_PER_PAGE))))}
+                    disabled={customersPage === Math.max(1, Math.ceil(filteredCustomers.length / ENTRIES_PER_PAGE))}
+                    className="px-3 py-1.5 border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all select-none cursor-pointer"
+                  >
+                    Next
+                  </button>
                 </div>
-              </Link>
-            ))}
-          </div>
-        )}
+              </div>
+            )}
+          </div>}
 
         {/* Add Customer Modal Drawer */}
         {showAddModal && (

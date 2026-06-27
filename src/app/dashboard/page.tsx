@@ -403,7 +403,7 @@ export default function DashboardPage() {
             className="py-2.5 px-4 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-primary/10 transition-transform active:scale-95"
           >
             <Plus className="h-4 w-4" />
-            {user?.role !== 'partner' ? 'Add Booking' : 'View Bookings'}
+            Add Booking
           </Link>
         </div>
 
