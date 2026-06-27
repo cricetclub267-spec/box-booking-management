@@ -72,11 +72,22 @@ export default function ExpensesPage() {
       setLoading(true);
     }
     try {
-      const allExpenses = await getExpenses();
-      setExpenses(allExpenses);
+      try {
+        const allUsers = await getUsersList();
+        setUsersList(allUsers);
+        if (allUsers.length > 0 && !formPhone) {
+          setFormPhone(allUsers[0].phone);
+        }
+      } catch (err) {
+        console.error('Error loading users list:', err);
+      }
 
-      const allUsers = await getUsersList();
-      setUsersList(allUsers);
+      try {
+        const allExpenses = await getExpenses();
+        setExpenses(allExpenses);
+      } catch (err) {
+        console.error('Error loading expenses:', err);
+      }
     } catch (e) {
       console.error('Error loading expenses page data:', e);
     } finally {
@@ -535,6 +546,7 @@ export default function ExpensesPage() {
                     placeholder="0.00"
                     value={formAmount}
                     onChange={(e) => setFormAmount(e.target.value)}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="w-full pl-7 pr-3 py-2 bg-muted/30 border border-border/80 rounded-xl focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs transition-all font-semibold"
                   />
                 </div>
