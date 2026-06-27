@@ -197,6 +197,37 @@ export default function ReportsPage() {
     .filter(p => p.payment_method === 'Cash')
     .reduce((sum, p) => sum + Number(p.amount_paid), 0);
 
+  const getActiveRangeType = () => {
+    const today = new Date();
+    const todayStr = getLocalFormattedDate(today);
+    
+    // Day
+    if (startDate === todayStr && endDate === todayStr) {
+      return 'day';
+    }
+    
+    // Week
+    const day = today.getDay();
+    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(today);
+    monday.setDate(diff);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    if (startDate === getLocalFormattedDate(monday) && endDate === getLocalFormattedDate(sunday)) {
+      return 'week';
+    }
+    
+    // Month
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    if (startDate === getLocalFormattedDate(firstDay) && endDate === getLocalFormattedDate(lastDay)) {
+      return 'month';
+    }
+    
+    return null;
+  };
+  const activeRangeType = getActiveRangeType();
+
   const ENTRIES_PER_PAGE = 12;
   const paginatedBookings = filteredBookings.slice((bookingsPage - 1) * ENTRIES_PER_PAGE, bookingsPage * ENTRIES_PER_PAGE);
   const paginatedRevenueBookings = filteredBookings.slice((revenueBookingsPage - 1) * ENTRIES_PER_PAGE, revenueBookingsPage * ENTRIES_PER_PAGE);
@@ -225,8 +256,47 @@ export default function ReportsPage() {
 
         {/* Date Filter Panel */}
         <div className="bg-card rounded-2xl border border-border/80 p-5 shadow-sm flex flex-wrap gap-4 items-center text-left">
-          <div className="flex items-center gap-2 text-xs font-bold text-primary mr-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-primary mr-1">
             <Filter className="h-4.5 w-4.5" /> Filter Parameters
+          </div>
+
+          {/* Day / Week / Month selector buttons */}
+          <div className="bg-muted/40 border border-border/80 rounded-xl p-1 flex shadow-sm mr-1">
+            {(['day', 'week', 'month'] as const).map(type => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => {
+                  const today = new Date();
+                  if (type === 'day') {
+                    const dateStr = getLocalFormattedDate(today);
+                    setStartDate(dateStr);
+                    setEndDate(dateStr);
+                  } else if (type === 'week') {
+                    const day = today.getDay();
+                    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+                    const monday = new Date(today);
+                    monday.setDate(diff);
+                    const sunday = new Date(monday);
+                    sunday.setDate(monday.getDate() + 6);
+                    setStartDate(getLocalFormattedDate(monday));
+                    setEndDate(getLocalFormattedDate(sunday));
+                  } else if (type === 'month') {
+                    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+                    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    setStartDate(getLocalFormattedDate(firstDay));
+                    setEndDate(getLocalFormattedDate(lastDay));
+                  }
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
+                  activeRangeType === type
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {type === 'day' ? 'Day' : type === 'week' ? 'Week' : 'Month'}
+              </button>
+            ))}
           </div>
           
           <div className="flex items-center gap-2 text-xs">
@@ -404,7 +474,7 @@ export default function ReportsPage() {
                   </div>
 
                   {/* Pagination Controls */}
-                  {Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE) > 1 && (
+                  {filteredBookings.length > 0 && (
                     <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-4 border-t border-border bg-muted/10 text-xs font-semibold gap-3">
                       <span className="text-muted-foreground text-center sm:text-left">
                         Showing <strong className="text-foreground">{(bookingsPage - 1) * ENTRIES_PER_PAGE + 1}</strong> to <strong className="text-foreground">{Math.min(bookingsPage * ENTRIES_PER_PAGE, filteredBookings.length)}</strong> of <strong className="text-foreground">{filteredBookings.length}</strong> entries
@@ -418,8 +488,8 @@ export default function ReportsPage() {
                         >
                           Previous
                         </button>
-                        {Array.from({ length: Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE) }, (_, i) => i + 1)
-                          .filter(page => page === 1 || page === Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE) || Math.abs(page - bookingsPage) <= 1)
+                        {Array.from({ length: Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)) }, (_, i) => i + 1)
+                          .filter(page => page === 1 || page === Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)) || Math.abs(page - bookingsPage) <= 1)
                           .map((page, idx, arr) => {
                             const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
                             return (
@@ -441,8 +511,8 @@ export default function ReportsPage() {
                           })}
                         <button
                           type="button"
-                          onClick={() => setBookingsPage(prev => Math.min(prev + 1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)))}
-                          disabled={bookingsPage === Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)}
+                          onClick={() => setBookingsPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE))))}
+                          disabled={bookingsPage === Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE))}
                           className="px-3 py-1.5 border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all select-none cursor-pointer"
                         >
                           Next
@@ -547,7 +617,7 @@ export default function ReportsPage() {
                   </div>
 
                   {/* Pagination Controls */}
-                  {Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE) > 1 && (
+                  {filteredBookings.length > 0 && (
                     <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-4 border-t border-border bg-muted/10 text-xs font-semibold gap-3">
                       <span className="text-muted-foreground text-center sm:text-left">
                         Showing <strong className="text-foreground">{(revenueBookingsPage - 1) * ENTRIES_PER_PAGE + 1}</strong> to <strong className="text-foreground">{Math.min(revenueBookingsPage * ENTRIES_PER_PAGE, filteredBookings.length)}</strong> of <strong className="text-foreground">{filteredBookings.length}</strong> entries
@@ -561,8 +631,8 @@ export default function ReportsPage() {
                         >
                           Previous
                         </button>
-                        {Array.from({ length: Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE) }, (_, i) => i + 1)
-                          .filter(page => page === 1 || page === Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE) || Math.abs(page - revenueBookingsPage) <= 1)
+                        {Array.from({ length: Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)) }, (_, i) => i + 1)
+                          .filter(page => page === 1 || page === Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)) || Math.abs(page - revenueBookingsPage) <= 1)
                           .map((page, idx, arr) => {
                             const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
                             return (
@@ -584,8 +654,8 @@ export default function ReportsPage() {
                           })}
                         <button
                           type="button"
-                          onClick={() => setRevenueBookingsPage(prev => Math.min(prev + 1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)))}
-                          disabled={revenueBookingsPage === Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)}
+                          onClick={() => setRevenueBookingsPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE))))}
+                          disabled={revenueBookingsPage === Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE))}
                           className="px-3 py-1.5 border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all select-none cursor-pointer"
                         >
                           Next
@@ -654,7 +724,7 @@ export default function ReportsPage() {
                   </div>
 
                   {/* Pagination Controls */}
-                  {Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE) > 1 && (
+                  {filteredExpenses.length > 0 && (
                     <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-4 border-t border-border bg-muted/10 text-xs font-semibold gap-3">
                       <span className="text-muted-foreground text-center sm:text-left">
                         Showing <strong className="text-foreground">{(revenueExpensesPage - 1) * ENTRIES_PER_PAGE + 1}</strong> to <strong className="text-foreground">{Math.min(revenueExpensesPage * ENTRIES_PER_PAGE, filteredExpenses.length)}</strong> of <strong className="text-foreground">{filteredExpenses.length}</strong> entries
@@ -668,8 +738,8 @@ export default function ReportsPage() {
                         >
                           Previous
                         </button>
-                        {Array.from({ length: Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE) }, (_, i) => i + 1)
-                          .filter(page => page === 1 || page === Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE) || Math.abs(page - revenueExpensesPage) <= 1)
+                        {Array.from({ length: Math.max(1, Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE)) }, (_, i) => i + 1)
+                          .filter(page => page === 1 || page === Math.max(1, Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE)) || Math.abs(page - revenueExpensesPage) <= 1)
                           .map((page, idx, arr) => {
                             const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
                             return (
@@ -691,8 +761,8 @@ export default function ReportsPage() {
                           })}
                         <button
                           type="button"
-                          onClick={() => setRevenueExpensesPage(prev => Math.min(prev + 1, Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE)))}
-                          disabled={revenueExpensesPage === Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE)}
+                          onClick={() => setRevenueExpensesPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE))))}
+                          disabled={revenueExpensesPage === Math.max(1, Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE))}
                           className="px-3 py-1.5 border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all select-none cursor-pointer"
                         >
                           Next
@@ -787,7 +857,7 @@ export default function ReportsPage() {
                   </div>
 
                   {/* Pagination Controls */}
-                  {Math.ceil(filteredPayments.length / ENTRIES_PER_PAGE) > 1 && (
+                  {filteredPayments.length > 0 && (
                     <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-4 border-t border-border bg-muted/10 text-xs font-semibold gap-3">
                       <span className="text-muted-foreground text-center sm:text-left">
                         Showing <strong className="text-foreground">{(paymentsPage - 1) * ENTRIES_PER_PAGE + 1}</strong> to <strong className="text-foreground">{Math.min(paymentsPage * ENTRIES_PER_PAGE, filteredPayments.length)}</strong> of <strong className="text-foreground">{filteredPayments.length}</strong> entries
@@ -801,8 +871,8 @@ export default function ReportsPage() {
                         >
                           Previous
                         </button>
-                        {Array.from({ length: Math.ceil(filteredPayments.length / ENTRIES_PER_PAGE) }, (_, i) => i + 1)
-                          .filter(page => page === 1 || page === Math.ceil(filteredPayments.length / ENTRIES_PER_PAGE) || Math.abs(page - paymentsPage) <= 1)
+                        {Array.from({ length: Math.max(1, Math.ceil(filteredPayments.length / ENTRIES_PER_PAGE)) }, (_, i) => i + 1)
+                          .filter(page => page === 1 || page === Math.max(1, Math.ceil(filteredPayments.length / ENTRIES_PER_PAGE)) || Math.abs(page - paymentsPage) <= 1)
                           .map((page, idx, arr) => {
                             const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
                             return (
@@ -824,8 +894,8 @@ export default function ReportsPage() {
                           })}
                         <button
                           type="button"
-                          onClick={() => setPaymentsPage(prev => Math.min(prev + 1, Math.ceil(filteredPayments.length / ENTRIES_PER_PAGE)))}
-                          disabled={paymentsPage === Math.ceil(filteredPayments.length / ENTRIES_PER_PAGE)}
+                          onClick={() => setPaymentsPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(filteredPayments.length / ENTRIES_PER_PAGE))))}
+                          disabled={paymentsPage === Math.max(1, Math.ceil(filteredPayments.length / ENTRIES_PER_PAGE))}
                           className="px-3 py-1.5 border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all select-none cursor-pointer"
                         >
                           Next
@@ -904,7 +974,7 @@ export default function ReportsPage() {
                   </div>
 
                   {/* Pagination Controls */}
-                  {Math.ceil(filteredDiscounts.length / ENTRIES_PER_PAGE) > 1 && (
+                  {filteredDiscounts.length > 0 && (
                     <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-4 border-t border-border bg-muted/10 text-xs font-semibold gap-3">
                       <span className="text-muted-foreground text-center sm:text-left">
                         Showing <strong className="text-foreground">{(discountsPage - 1) * ENTRIES_PER_PAGE + 1}</strong> to <strong className="text-foreground">{Math.min(discountsPage * ENTRIES_PER_PAGE, filteredDiscounts.length)}</strong> of <strong className="text-foreground">{filteredDiscounts.length}</strong> entries
@@ -918,8 +988,8 @@ export default function ReportsPage() {
                         >
                           Previous
                         </button>
-                        {Array.from({ length: Math.ceil(filteredDiscounts.length / ENTRIES_PER_PAGE) }, (_, i) => i + 1)
-                          .filter(page => page === 1 || page === Math.ceil(filteredDiscounts.length / ENTRIES_PER_PAGE) || Math.abs(page - discountsPage) <= 1)
+                        {Array.from({ length: Math.max(1, Math.ceil(filteredDiscounts.length / ENTRIES_PER_PAGE)) }, (_, i) => i + 1)
+                          .filter(page => page === 1 || page === Math.max(1, Math.ceil(filteredDiscounts.length / ENTRIES_PER_PAGE)) || Math.abs(page - discountsPage) <= 1)
                           .map((page, idx, arr) => {
                             const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
                             return (
@@ -941,8 +1011,8 @@ export default function ReportsPage() {
                           })}
                         <button
                           type="button"
-                          onClick={() => setDiscountsPage(prev => Math.min(prev + 1, Math.ceil(filteredDiscounts.length / ENTRIES_PER_PAGE)))}
-                          disabled={discountsPage === Math.ceil(filteredDiscounts.length / ENTRIES_PER_PAGE)}
+                          onClick={() => setDiscountsPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(filteredDiscounts.length / ENTRIES_PER_PAGE))))}
+                          disabled={discountsPage === Math.max(1, Math.ceil(filteredDiscounts.length / ENTRIES_PER_PAGE))}
                           className="px-3 py-1.5 border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all select-none cursor-pointer"
                         >
                           Next

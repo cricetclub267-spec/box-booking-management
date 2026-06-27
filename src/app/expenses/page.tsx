@@ -469,7 +469,7 @@ export default function ExpensesPage() {
               </div>
 
               {/* Pagination Controls */}
-              {Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE) > 1 && (
+              {filteredExpenses.length > 0 && (
                 <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-4 border-t border-border bg-muted/10 text-xs font-semibold gap-3">
                   <span className="text-muted-foreground text-center sm:text-left">
                     Showing <strong className="text-foreground">{(expensesPage - 1) * ENTRIES_PER_PAGE + 1}</strong> to <strong className="text-foreground">{Math.min(expensesPage * ENTRIES_PER_PAGE, filteredExpenses.length)}</strong> of <strong className="text-foreground">{filteredExpenses.length}</strong> entries
@@ -483,8 +483,8 @@ export default function ExpensesPage() {
                     >
                       Previous
                     </button>
-                    {Array.from({ length: Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE) }, (_, i) => i + 1)
-                      .filter(page => page === 1 || page === Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE) || Math.abs(page - expensesPage) <= 1)
+                    {Array.from({ length: Math.max(1, Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE)) }, (_, i) => i + 1)
+                      .filter(page => page === 1 || page === Math.max(1, Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE)) || Math.abs(page - expensesPage) <= 1)
                       .map((page, idx, arr) => {
                         const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
                         return (
@@ -506,8 +506,8 @@ export default function ExpensesPage() {
                       })}
                     <button
                       type="button"
-                      onClick={() => setExpensesPage(prev => Math.min(prev + 1, Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE)))}
-                      disabled={expensesPage === Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE)}
+                      onClick={() => setExpensesPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE))))}
+                      disabled={expensesPage === Math.max(1, Math.ceil(filteredExpenses.length / ENTRIES_PER_PAGE))}
                       className="px-3 py-1.5 border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all select-none cursor-pointer"
                     >
                       Next

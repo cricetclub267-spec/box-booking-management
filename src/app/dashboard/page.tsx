@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToastStore } from '@/lib/store/toast-store';
+import { useAuthStore } from '@/lib/store/auth-store';
+import { DatePicker } from '@/components/ui/date-picker';
 
 import dynamic from 'next/dynamic';
 
@@ -71,6 +73,7 @@ const getLocalFormattedDateFromTimestamp = (timestampStr: string) => {
 
 export default function DashboardPage() {
   const { showToast } = useToastStore();
+  const { user } = useAuthStore();
   const [filterType, setFilterType] = useState<'today' | 'week' | 'month'>('today');
   const [filterDate, setFilterDate] = useState<string>('');
 
@@ -400,7 +403,7 @@ export default function DashboardPage() {
             className="py-2.5 px-4 bg-primary hover:bg-primary/95 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-primary/10 transition-transform active:scale-95"
           >
             <Plus className="h-4 w-4" />
-            Manage Bookings
+            {user?.role !== 'partner' ? 'Add Booking' : 'View Bookings'}
           </Link>
         </div>
 
@@ -448,13 +451,12 @@ export default function DashboardPage() {
             {/* Date Picker Input */}
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold text-muted-foreground uppercase hidden sm:inline-block">Date:</span>
-              <input
-                type="date"
+              <DatePicker
                 value={filterDate}
-                onChange={(e) => {
-                  if (e.target.value) setFilterDate(e.target.value);
+                onChange={(val) => {
+                  if (val) setFilterDate(val);
                 }}
-                className="px-3 py-1.5 bg-card border border-border rounded-xl text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer shadow-sm"
+                align="end"
               />
             </div>
           </div>

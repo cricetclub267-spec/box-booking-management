@@ -1587,7 +1587,7 @@ function BookingsContent() {
           </DropdownMenu>
 
           {/* Add Booking trigger */}
-          {user?.role === 'admin' && (
+          {user?.role !== 'partner' && (
             <button
               onClick={() => {
                 resetBookingForm();

@@ -40,6 +40,7 @@ import {
   DropdownMenuContent, 
   DropdownMenuItem 
 } from '@/components/ui/dropdown-menu';
+import { DatePicker } from '@/components/ui/date-picker';
 
 export default function PaymentsPage() {
   const { user } = useAuthStore();
@@ -511,13 +512,12 @@ export default function PaymentsPage() {
             {dateFilterType !== 'all' && (
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase hidden sm:inline-block">Date:</span>
-                <input
-                  type="date"
+                <DatePicker
                   value={selectedFilterDate}
-                  onChange={(e) => {
-                    if (e.target.value) setSelectedFilterDate(e.target.value);
+                  onChange={(val) => {
+                    if (val) setSelectedFilterDate(val);
                   }}
-                  className="px-3 py-1.5 bg-card border border-border rounded-xl text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer shadow-sm"
+                  align="end"
                 />
               </div>
             )}
@@ -831,7 +831,7 @@ export default function PaymentsPage() {
                 </div>
                 
                 {/* Pagination Controls */}
-                {Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE) > 1 && (
+                {filteredBookings.length > 0 && (
                   <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-4 border-t border-border bg-muted/10 text-xs font-semibold gap-3">
                     <span className="text-muted-foreground text-center sm:text-left">
                       Showing <strong className="text-foreground">{(balancesPage - 1) * ENTRIES_PER_PAGE + 1}</strong> to <strong className="text-foreground">{Math.min(balancesPage * ENTRIES_PER_PAGE, filteredBookings.length)}</strong> of <strong className="text-foreground">{filteredBookings.length}</strong> entries
@@ -845,8 +845,8 @@ export default function PaymentsPage() {
                       >
                         Previous
                       </button>
-                      {Array.from({ length: Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE) }, (_, i) => i + 1)
-                        .filter(page => page === 1 || page === Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE) || Math.abs(page - balancesPage) <= 1)
+                      {Array.from({ length: Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)) }, (_, i) => i + 1)
+                        .filter(page => page === 1 || page === Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)) || Math.abs(page - balancesPage) <= 1)
                         .map((page, idx, arr) => {
                           const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
                           return (
@@ -859,7 +859,7 @@ export default function PaymentsPage() {
                                   balancesPage === page
                                     ? 'bg-primary text-white border-primary shadow-sm'
                                     : 'border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted'
-                                }`}
+                                  }`}
                               >
                                 {page}
                               </button>
@@ -868,8 +868,8 @@ export default function PaymentsPage() {
                         })}
                       <button
                         type="button"
-                        onClick={() => setBalancesPage(prev => Math.min(prev + 1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)))}
-                        disabled={balancesPage === Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE)}
+                        onClick={() => setBalancesPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE))))}
+                        disabled={balancesPage === Math.max(1, Math.ceil(filteredBookings.length / ENTRIES_PER_PAGE))}
                         className="px-3 py-1.5 border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all select-none cursor-pointer"
                       >
                         Next
@@ -1013,7 +1013,7 @@ export default function PaymentsPage() {
                 </div>
 
                 {/* Pagination Controls */}
-                {Math.ceil(filteredReceipts.length / ENTRIES_PER_PAGE) > 1 && (
+                {filteredReceipts.length > 0 && (
                   <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-4 border-t border-border bg-muted/10 text-xs font-semibold gap-3">
                     <span className="text-muted-foreground text-center sm:text-left">
                       Showing <strong className="text-foreground">{(receiptsPage - 1) * ENTRIES_PER_PAGE + 1}</strong> to <strong className="text-foreground">{Math.min(receiptsPage * ENTRIES_PER_PAGE, filteredReceipts.length)}</strong> of <strong className="text-foreground">{filteredReceipts.length}</strong> entries
@@ -1027,8 +1027,8 @@ export default function PaymentsPage() {
                       >
                         Previous
                       </button>
-                      {Array.from({ length: Math.ceil(filteredReceipts.length / ENTRIES_PER_PAGE) }, (_, i) => i + 1)
-                        .filter(page => page === 1 || page === Math.ceil(filteredReceipts.length / ENTRIES_PER_PAGE) || Math.abs(page - receiptsPage) <= 1)
+                      {Array.from({ length: Math.max(1, Math.ceil(filteredReceipts.length / ENTRIES_PER_PAGE)) }, (_, i) => i + 1)
+                        .filter(page => page === 1 || page === Math.max(1, Math.ceil(filteredReceipts.length / ENTRIES_PER_PAGE)) || Math.abs(page - receiptsPage) <= 1)
                         .map((page, idx, arr) => {
                           const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
                           return (
@@ -1041,7 +1041,7 @@ export default function PaymentsPage() {
                                   receiptsPage === page
                                     ? 'bg-primary text-white border-primary shadow-sm'
                                     : 'border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted'
-                                }`}
+                                  }`}
                               >
                                 {page}
                               </button>
@@ -1050,8 +1050,8 @@ export default function PaymentsPage() {
                         })}
                       <button
                         type="button"
-                        onClick={() => setReceiptsPage(prev => Math.min(prev + 1, Math.ceil(filteredReceipts.length / ENTRIES_PER_PAGE)))}
-                        disabled={receiptsPage === Math.ceil(filteredReceipts.length / ENTRIES_PER_PAGE)}
+                        onClick={() => setReceiptsPage(prev => Math.min(prev + 1, Math.max(1, Math.ceil(filteredReceipts.length / ENTRIES_PER_PAGE))))}
+                        disabled={receiptsPage === Math.max(1, Math.ceil(filteredReceipts.length / ENTRIES_PER_PAGE))}
                         className="px-3 py-1.5 border border-border bg-card hover:bg-muted text-muted-foreground hover:text-foreground rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all select-none cursor-pointer"
                       >
                         Next
