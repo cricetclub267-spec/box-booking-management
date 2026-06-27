@@ -20,7 +20,9 @@ import {
   ChevronRight,
   TrendingUp,
   Sparkles,
-  ArrowDownCircle
+  ArrowDownCircle,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -41,6 +43,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [globalSearch, setGlobalSearch] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Persist sidebar state in localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('sidebar_collapsed');
+    if (saved === 'true') setSidebarCollapsed(true);
+  }, []);
+
+  const toggleSidebar = () => {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    localStorage.setItem('sidebar_collapsed', String(next));
+  };
   
   // Close popovers on click outside
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -140,28 +155,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen flex bg-background font-sans">
       {/* SIDEBAR - DESKTOP */}
-      <aside className="hidden lg:flex flex-col w-64 bg-card border-r border-border/80 p-6 shrink-0 relative">
+      <aside className={`hidden lg:flex flex-col bg-card border-r border-border/80 shrink-0 relative transition-all duration-300 ease-in-out ${sidebarCollapsed ? 'w-[72px] p-3' : 'w-64 p-6'}`}>
         {/* Brand Logo */}
-        <div className="flex items-center gap-3 mb-8 px-2">
+        <div className={`flex items-center mb-8 ${sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-2'}`}>
           <img 
             src="/logo.png" 
             alt="360 Club Box Logo" 
-            className="h-9 w-auto object-contain max-w-[45px]"
+            className={`object-contain ${sidebarCollapsed ? 'h-8 max-w-[32px]' : 'h-9 max-w-[45px]'}`}
             onError={(e) => {
               (e.target as HTMLElement).style.display = 'none';
             }}
           />
-          <div>
-            <h2 className="font-bold text-sm text-foreground tracking-tight leading-tight">360 Club Box</h2>
-            <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider leading-none mt-0.5">Management</p>
-          </div>
+          {!sidebarCollapsed && (
+            <div>
+              <h2 className="font-bold text-sm text-foreground tracking-tight leading-tight">360 Club Box</h2>
+              <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wider leading-none mt-0.5">Management</p>
+            </div>
+          )}
         </div>
 
         {/* Navigation Menu */}
         <div className="flex-1 flex flex-col justify-between">
           <div className="space-y-6">
             <div>
-              <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest px-3 mb-3">Menu</p>
+              {!sidebarCollapsed && (
+                <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest px-3 mb-3">Menu</p>
+              )}
               <nav className="space-y-1">
                 {navItems.map((item) => {
                   const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
@@ -170,14 +189,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <Link
                       key={item.name}
                       href={item.path}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group ${
+                      title={sidebarCollapsed ? item.name : undefined}
+                      className={`flex items-center rounded-xl font-semibold transition-all group ${
+                        sidebarCollapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5 text-sm'
+                      } ${
                         isActive
                           ? 'bg-primary text-white shadow-md shadow-primary/10'
                           : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
                       }`}
                     >
                       <Icon className={`h-4 w-4 shrink-0 transition-transform group-hover:scale-105 ${isActive ? 'text-white' : 'text-muted-foreground/75 group-hover:text-foreground'}`} />
-                      <span>{item.name}</span>
+                      {!sidebarCollapsed && <span>{item.name}</span>}
                     </Link>
                   );
                 })}
@@ -185,7 +207,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             <div>
-              <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest px-3 mb-3">General</p>
+              {!sidebarCollapsed && (
+                <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest px-3 mb-3">General</p>
+              )}
               <nav className="space-y-1">
                 {generalItems.map((item) => {
                   const isActive = pathname === item.path;
@@ -194,14 +218,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <Link
                       key={item.name}
                       href={item.path}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all group ${
+                      title={sidebarCollapsed ? item.name : undefined}
+                      className={`flex items-center rounded-xl font-semibold transition-all group ${
+                        sidebarCollapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5 text-sm'
+                      } ${
                         isActive
                           ? 'bg-primary text-white shadow-md shadow-primary/10'
                           : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
                       }`}
                     >
                       <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-white' : 'text-muted-foreground/75 group-hover:text-foreground'}`} />
-                      <span>{item.name}</span>
+                      {!sidebarCollapsed && <span>{item.name}</span>}
                     </Link>
                   );
                 })}
@@ -209,22 +236,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
 
-          {/* User Section (No sidebar logout button on desktop) */}
-          <div className="pt-6 border-t border-border/80">
-            <div className="bg-accent/40 rounded-xl p-3.5 border border-primary/10 relative overflow-hidden flex items-center gap-2">
-              <div className="absolute right-0 top-0 translate-x-2 -translate-y-2 opacity-5">
-                <Sparkles className="h-16 w-16" />
+          {/* User Section + Collapse Toggle */}
+          <div className="pt-6 border-t border-border/80 space-y-3">
+            {sidebarCollapsed ? (
+              <div className="flex justify-center">
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/25 text-xs" title={user.email}>
+                  {user.role === 'admin' ? 'A' : 'P'}
+                </div>
               </div>
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/25">
-                {user.role === 'admin' ? 'A' : 'P'}
+            ) : (
+              <div className="bg-accent/40 rounded-xl p-3.5 border border-primary/10 relative overflow-hidden flex items-center gap-2">
+                <div className="absolute right-0 top-0 translate-x-2 -translate-y-2 opacity-5">
+                  <Sparkles className="h-16 w-16" />
+                </div>
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/25">
+                  {user.role === 'admin' ? 'A' : 'P'}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-bold truncate text-foreground">{user.email}</p>
+                  <p className="text-[10px] font-bold text-primary uppercase tracking-wider -mt-0.5">
+                    {user.role === 'admin' ? 'Turf Owner' : 'Partner (Read-only)'}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold truncate text-foreground">{user.email}</p>
-                <p className="text-[10px] font-bold text-primary uppercase tracking-wider -mt-0.5">
-                  {user.role === 'admin' ? 'Turf Owner' : 'Partner (Read-only)'}
-                </p>
-              </div>
-            </div>
+            )}
+
+            {/* Collapse / Expand Toggle */}
+            <button
+              onClick={toggleSidebar}
+              className={`w-full flex items-center gap-2 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-all cursor-pointer ${sidebarCollapsed ? 'justify-center px-2' : 'px-3'}`}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {sidebarCollapsed ? (
+                <ChevronsRight className="h-4 w-4" />
+              ) : (
+                <>
+                  <ChevronsLeft className="h-4 w-4" />
+                  <span>Collapse</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </aside>
