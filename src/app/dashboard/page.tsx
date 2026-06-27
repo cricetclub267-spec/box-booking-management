@@ -45,6 +45,15 @@ const BookingsChart = dynamic(() => import('@/components/dashboard/bookings-char
   )
 });
 
+const PaymentModeChart = dynamic(() => import('@/components/dashboard/payment-mode-chart'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-full w-full flex items-center justify-center">
+      <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  )
+});
+
 const getLocalFormattedDate = (date: Date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -76,6 +85,7 @@ export default function DashboardPage() {
 
   // Chart data
   const [chartData, setChartData] = useState<any[]>([]);
+  const [paymentModeStats, setPaymentModeStats] = useState<{ name: string; value: number }[]>([]);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -132,6 +142,19 @@ export default function DashboardPage() {
           pendingPayments: totalDues,
           totalCustomers: c.length
         });
+
+        // Payment mode breakdown
+        const upiTotal = activePayments.filter(pay => pay.payment_method === 'UPI').reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
+        const cashTotal = activePayments.filter(pay => pay.payment_method === 'Cash').reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
+        const cardTotal = activePayments.filter(pay => pay.payment_method === 'Card').reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
+        const bankTotal = activePayments.filter(pay => pay.payment_method === 'Bank Transfer').reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
+
+        setPaymentModeStats([
+          { name: 'UPI', value: upiTotal },
+          { name: 'Cash', value: cashTotal },
+          { name: 'Card', value: cardTotal },
+          { name: 'Bank Transfer', value: bankTotal }
+        ]);
 
         // 2. Generate past 7 days trend data for charts
         const trend: any[] = [];
@@ -241,9 +264,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Charts & Analytics Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Revenue Trend Area Chart */}
-          <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm lg:col-span-2 text-left">
+          <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm md:col-span-2 text-left">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-bold text-sm text-foreground">Revenue Collection Trend</h3>
@@ -277,6 +300,22 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <BookingsChart data={chartData} />
+              )}
+            </div>
+          </div>
+
+          {/* Payment Method Share Pie Chart */}
+          <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm text-left">
+            <h3 className="font-bold text-sm text-foreground mb-1">Payment Method Share</h3>
+            <p className="text-[10px] text-muted-foreground mb-4">Breakdown of collections by payment mode</p>
+            
+            <div className="h-64 w-full">
+              {loading ? (
+                <div className="h-full w-full flex items-center justify-center">
+                  <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : (
+                <PaymentModeChart data={paymentModeStats} />
               )}
             </div>
           </div>
