@@ -1,5 +1,5 @@
 // Mock Database Layer using LocalStorage (SSR-Safe)
-import { Ground, Customer, Booking, Payment, ActivityLog, PaymentStatus, User } from './types';
+import { Ground, Customer, Booking, Payment, ActivityLog, PaymentStatus, User, Expense } from './types';
 
 // Helper to check if running in browser
 const isBrowser = typeof window !== 'undefined';
@@ -11,6 +11,7 @@ let memBookings: Booking[] = [];
 let memPayments: Payment[] = [];
 let memActivityLogs: ActivityLog[] = [];
 let memUsers: User[] = [];
+let memExpenses: Expense[] = [];
 
 // Default Grounds
 const DEFAULT_GROUNDS: Ground[] = [
@@ -37,6 +38,7 @@ const initializeSeedData = () => {
     localStorage.setItem('turf_customers', JSON.stringify([]));
     localStorage.setItem('turf_bookings', JSON.stringify([]));
     localStorage.setItem('turf_payments', JSON.stringify([]));
+    localStorage.setItem('turf_expenses', JSON.stringify([]));
     
     // Seed default admin in mock users
     localStorage.setItem('turf_users', JSON.stringify([DEFAULT_ADMIN]));
@@ -50,6 +52,12 @@ const initializeSeedData = () => {
     const storedUsers = localStorage.getItem('turf_users');
     if (!storedUsers) {
       localStorage.setItem('turf_users', JSON.stringify([DEFAULT_ADMIN]));
+    }
+    
+    // Ensure turf_expenses exists
+    const storedExpenses = localStorage.getItem('turf_expenses');
+    if (!storedExpenses) {
+      localStorage.setItem('turf_expenses', JSON.stringify([]));
     }
     
     // Migration: Update existing grounds with old names/prices
@@ -377,4 +385,60 @@ export const addPayment = (paymentData: Omit<Payment, 'id' | 'payment_date'>, us
   logActivity(`Received payment of ₹${paymentData.amount_paid} via ${paymentData.payment_method} from ${customerName}`, userEmail);
 
   return newPayment;
+};
+
+// Expenses functions
+export const getExpenses = (): Expense[] => {
+  if (!isBrowser) return memExpenses;
+  const data = localStorage.getItem('turf_expenses');
+  return data ? JSON.parse(data) : [];
+};
+
+const setExpenses = (expenses: Expense[]) => {
+  if (isBrowser) localStorage.setItem('turf_expenses', JSON.stringify(expenses));
+  else memExpenses = expenses;
+};
+
+export const createExpense = (
+  expenseData: Omit<Expense, 'id' | 'created_at'>,
+  userEmail: string = 'admin@turf.com'
+): Expense => {
+  const expenses = getExpenses();
+  const newExpense: Expense = {
+    ...expenseData,
+    id: `exp_${Date.now()}`,
+    created_at: new Date().toISOString()
+  };
+  setExpenses([...expenses, newExpense]);
+  logActivity(`Added expense of ₹${expenseData.amount} for "${expenseData.reason}" by ${expenseData.user_phone}`, userEmail);
+  return newExpense;
+};
+
+export const updateExpense = (
+  updatedExpense: Expense,
+  userEmail: string = 'admin@turf.com'
+): Expense => {
+  const expenses = getExpenses();
+  const index = expenses.findIndex(e => e.id === updatedExpense.id);
+  if (index === -1) {
+    throw new Error('Expense not found');
+  }
+  expenses[index] = updatedExpense;
+  setExpenses(expenses);
+  logActivity(`Updated expense ${updatedExpense.id} details`, userEmail);
+  return updatedExpense;
+};
+
+export const deleteExpense = (
+  expenseId: string,
+  userEmail: string = 'admin@turf.com'
+): void => {
+  const expenses = getExpenses();
+  const expense = expenses.find(e => e.id === expenseId);
+  if (!expense) {
+    throw new Error('Expense not found');
+  }
+  const filtered = expenses.filter(e => e.id !== expenseId);
+  setExpenses(filtered);
+  logActivity(`Deleted expense of ₹${expense.amount} for "${expense.reason}"`, userEmail);
 };

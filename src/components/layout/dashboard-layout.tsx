@@ -19,7 +19,8 @@ import {
   Activity,
   ChevronRight,
   TrendingUp,
-  Sparkles
+  Sparkles,
+  ArrowDownCircle
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -107,6 +108,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Calendar / Bookings', path: '/bookings', icon: Calendar },
     { name: 'Customers', path: '/customers', icon: Users },
     { name: 'Payments', path: '/payments', icon: CreditCard },
+    { name: 'Expenses', path: '/expenses', icon: ArrowDownCircle },
     { name: 'Reports', path: '/reports', icon: FileText },
   ];
 

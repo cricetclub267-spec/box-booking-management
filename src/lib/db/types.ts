@@ -65,3 +65,13 @@ export interface ActivityLog {
   user_email: string;
   created_at: string;
 }
+
+export interface Expense {
+  id: string;
+  user_id?: string | null;
+  user_phone: string;
+  reason: string;
+  amount: number;
+  expense_date: string; // YYYY-MM-DD
+  created_at: string;
+}

@@ -1,5 +1,5 @@
 import type jsPDF from 'jspdf';
-import { Booking, Payment } from './db/types';
+import { Booking, Payment, Expense } from './db/types';
 import { supabase, hasSupabaseCredentials } from './db/supabase';
 import * as mockDb from './db/mock-db';
 
@@ -278,7 +278,8 @@ export const exportRevenueReportPDF = async (
   bookingsList: Booking[],
   paymentSummaries: Record<string, { totalPaid: number; pendingAmount: number; status: string }>,
   dateRange: string,
-  paymentsList: Payment[] = []
+  paymentsList: Payment[] = [],
+  expensesList: Expense[] = []
 ) => {
   const { default: jsPDF } = await import('jspdf');
   const { default: autoTable } = await import('jspdf-autotable');
@@ -332,6 +333,8 @@ export const exportRevenueReportPDF = async (
     const summary = paymentSummaries[b.id];
     return sum + (summary ? summary.pendingAmount : 0);
   }, 0);
+  const totalExpenses = expensesList.reduce((sum, e) => sum + Number(e.amount), 0);
+  const netRevenueVal = Math.max(0, totalCollected - totalExpenses);
 
   // Calculate UPI and Cash breakdown from paymentsList matching bookingsList
   const filteredBookingIds = new Set(bookingsList.map(b => b.id));
@@ -347,11 +350,12 @@ export const exportRevenueReportPDF = async (
 
   autoTable(doc, {
     startY: 58,
-    head: [['Billable Amount', 'Discounts Given', 'Revenue Collected', 'Outstanding Balances']],
+    head: [['Collected Revenue (Gross)', 'Total Expenses', 'Net Revenue', 'Discounts Given', 'Outstanding Balances']],
     body: [[
-      `Rs. ${totalRevenue.toLocaleString()}`,
-      `Rs. ${totalDiscounts.toLocaleString()}`,
       `Rs. ${totalCollected.toLocaleString()}\n(UPI: Rs. ${upiCollected.toLocaleString()}\nCash: Rs. ${cashCollected.toLocaleString()})`,
+      `Rs. ${totalExpenses.toLocaleString()}`,
+      `Rs. ${netRevenueVal.toLocaleString()}`,
+      `Rs. ${totalDiscounts.toLocaleString()}`,
       `Rs. ${totalDues.toLocaleString()}`
     ]],
     headStyles: { 
@@ -364,10 +368,11 @@ export const exportRevenueReportPDF = async (
     theme: 'grid',
     styles: { halign: 'center', cellPadding: 3.5, lineColor: BORDER_LIGHT, lineWidth: 0.1 },
     columnStyles: {
-      0: { cellWidth: 60 },
-      1: { cellWidth: 60 },
-      2: { cellWidth: 60 },
-      3: { cellWidth: 60 }
+      0: { cellWidth: 54 },
+      1: { cellWidth: 48 },
+      2: { cellWidth: 48 },
+      3: { cellWidth: 48 },
+      4: { cellWidth: 48 }
     }
   });
 
@@ -422,6 +427,45 @@ export const exportRevenueReportPDF = async (
       5: { cellWidth: 70 },  // Paid - wide so split amounts are fully visible
       6: { cellWidth: 22 },  // Dues
       7: { cellWidth: 22 },  // Status
+    }
+  });
+
+  // Render Expenses Breakdown Table below Bookings table
+  const expenseStartY = (doc as any).lastAutoTable.finalY + 10;
+  
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(12, 74, 40);
+  doc.text('EXPENSES BREAKDOWN LOG', 14, expenseStartY);
+
+  const expenseTableBody = expensesList.map(e => [
+    e.id.substring(0, 8),
+    new Date(e.expense_date).toLocaleDateString(),
+    e.user_phone,
+    e.reason,
+    `Rs. ${Number(e.amount).toLocaleString()}`
+  ]);
+
+  autoTable(doc, {
+    startY: expenseStartY + 4,
+    head: [['Expense ID', 'Date', 'Allocated Person (Phone)', 'Reason / Description', 'Amount']],
+    body: expenseTableBody.length > 0 ? expenseTableBody : [['-', '-', '-', 'No expenses recorded in this period', 'Rs. 0']],
+    headStyles: { 
+      fillColor: [120, 40, 40], // Dark Red/Rust for Expenses to visually differentiate from bookings green
+      textColor: [255, 255, 255], 
+      fontStyle: 'bold', 
+      halign: 'center' 
+    },
+    bodyStyles: { textColor: TEXT_DARK, fontSize: 8 },
+    alternateRowStyles: { fillColor: [255, 245, 245] },
+    theme: 'striped',
+    styles: { cellPadding: 3, lineColor: BORDER_LIGHT, lineWidth: 0.1, overflow: 'linebreak' },
+    columnStyles: {
+      0: { cellWidth: 26 }, // Expense ID
+      1: { cellWidth: 26 }, // Date
+      2: { cellWidth: 50 }, // Allocated Person (Phone)
+      3: { cellWidth: 135 }, // Reason
+      4: { cellWidth: 32 } // Amount
     }
   });
 

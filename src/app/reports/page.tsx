@@ -6,9 +6,10 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { 
   getBookings, 
   getPayments, 
-  getBookingPaymentSummaries 
+  getBookingPaymentSummaries,
+  getExpenses
 } from '@/lib/db/db-service';
-import { Booking, Payment } from '@/lib/db/types';
+import { Booking, Payment, Expense } from '@/lib/db/types';
 import { 
   exportRevenueReportPDF, 
   exportPaymentsReportPDF, 
@@ -51,6 +52,7 @@ export default function ReportsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [paymentSummaries, setPaymentSummaries] = useState<Record<string, { totalPaid: number; pendingAmount: number; status: string }>>({});
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters State
@@ -82,6 +84,9 @@ export default function ReportsPage() {
       const { summaries, payments: allPayments } = await getBookingPaymentSummaries(allBookings);
       setPayments(allPayments);
       setPaymentSummaries(summaries);
+
+      const allExpenses = await getExpenses();
+      setExpenses(allExpenses);
     } catch (e) {
       console.error('Error loading reports data:', e);
     } finally {
@@ -123,6 +128,13 @@ export default function ReportsPage() {
     });
   };
 
+  const getFilteredExpenses = () => {
+    return expenses.filter(e => {
+      const eDate = e.expense_date;
+      return (!startDate || eDate >= startDate) && (!endDate || eDate <= endDate);
+    });
+  };
+
   // Export handlers
   const handleExportPDF = async () => {
     const rangeText = `${startDate} to ${endDate}`;
@@ -130,7 +142,8 @@ export default function ReportsPage() {
     try {
       if (selectedReportTab === 'bookings' || selectedReportTab === 'revenue') {
         const activeList = getFilteredBookings();
-        await exportRevenueReportPDF(activeList, paymentSummaries, rangeText, payments);
+        const activeExpenses = getFilteredExpenses();
+        await exportRevenueReportPDF(activeList, paymentSummaries, rangeText, payments, activeExpenses);
       } else if (selectedReportTab === 'payments') {
         const activePayments = getFilteredPayments();
         await exportPaymentsReportPDF(activePayments, bookings, rangeText);
@@ -142,13 +155,11 @@ export default function ReportsPage() {
       console.error('Error exporting PDF:', e);
     }
   };
-
   // Dynamic calculations for display tiles
   const filteredBookings = getFilteredBookings();
   const filteredPayments = getFilteredPayments();
   const filteredDiscounts = getFilteredDiscounts();
-
-  // We want the metrics cards to show the total overall payments for the date range, regardless of payment method filter
+  const filteredExpenses = getFilteredExpenses();  // We want the metrics cards to show the total overall payments for the date range, regardless of payment method filter
   const overallCollectedPayments = payments.filter(p => {
     const pDate = getLocalFormattedDateFromTimestamp(p.payment_date);
     const parentBooking = bookings.find(b => b.id === p.booking_id);
@@ -158,6 +169,8 @@ export default function ReportsPage() {
 
   const totalBillable = filteredBookings.reduce((sum, b) => sum + Number(b.final_amount), 0);
   const totalCollected = overallCollectedPayments.reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const netRevenue = Math.max(0, totalCollected - totalExpenses);
   const totalDues = Math.max(0, totalBillable - totalCollected);
   const totalDiscountAmount = filteredDiscounts.reduce((sum, b) => sum + Number(b.discount), 0);
 
@@ -250,10 +263,13 @@ export default function ReportsPage() {
         </div>
 
         {/* Dynamic Financial Cards (Changes dynamically according to calculations) */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="bg-card border border-border/80 rounded-2xl p-4.5 shadow-sm">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Bookings Count</span>
             <span className="text-lg font-bold text-foreground block mt-1">{filteredBookings.length} bookings</span>
+            <div className="mt-2 pt-2 border-t border-border/60 text-[10px] text-muted-foreground font-semibold">
+              Discounts: <strong className="text-foreground">₹{totalDiscountAmount.toLocaleString('en-IN')}</strong>
+            </div>
           </div>
 
           <div className="bg-card border border-border/80 rounded-2xl p-4.5 shadow-sm">
@@ -272,13 +288,27 @@ export default function ReportsPage() {
           </div>
 
           <div className="bg-card border border-border/80 rounded-2xl p-4.5 shadow-sm">
-            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100 w-fit block">Dues Remaining</span>
-            <span className="text-lg font-bold text-amber-600 block mt-1">₹{totalDues.toLocaleString('en-IN')}</span>
+            <span className="text-[10px] font-bold text-red-800 bg-red-50 px-2 py-0.5 rounded-lg border border-red-100 w-fit block">Total Expenses</span>
+            <span className="text-lg font-bold text-red-700 block mt-1">₹{totalExpenses.toLocaleString('en-IN')}</span>
+            <div className="mt-2 pt-2 border-t border-border/60 text-[10px] text-muted-foreground font-semibold">
+              Count: <strong className="text-foreground">{filteredExpenses.length} entries</strong>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border/80 rounded-2xl p-4.5 shadow-sm bg-gradient-to-br from-emerald-50/10 to-primary/5">
+            <span className="text-[10px] font-bold text-primary bg-accent px-2 py-0.5 rounded-lg border border-primary/20 w-fit block">Net Revenue</span>
+            <span className="text-lg font-bold text-primary block mt-1">₹{netRevenue.toLocaleString('en-IN')}</span>
+            <div className="mt-2 pt-2 border-t border-primary/10 text-[10px] text-muted-foreground font-semibold">
+              Collected - Expenses
+            </div>
           </div>
 
           <div className="bg-card border border-border/80 rounded-2xl p-4.5 shadow-sm">
-            <span className="text-[10px] font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100 w-fit block">Discounts Given</span>
-            <span className="text-lg font-bold text-purple-700 block mt-1">₹{totalDiscountAmount.toLocaleString('en-IN')}</span>
+            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-100 w-fit block">Dues Remaining</span>
+            <span className="text-lg font-bold text-amber-600 block mt-1">₹{totalDues.toLocaleString('en-IN')}</span>
+            <div className="mt-2 pt-2 border-t border-border/60 text-[10px] text-muted-foreground font-semibold">
+              From active bookings
+            </div>
           </div>
         </div>
 
@@ -443,6 +473,77 @@ export default function ReportsPage() {
                         );
                       })
                     )}
+                  </div>
+
+                  {/* Expenses Breakdown Section (Deducted from revenue) */}
+                  <div className="mt-8 border-t border-border pt-6 px-5">
+                    <h3 className="text-xs font-bold text-foreground mb-3 flex items-center gap-2">
+                      <ArrowDownCircle className="h-4.5 w-4.5 text-red-600" />
+                      Expenses Breakdown (Deducted from Revenue)
+                    </h3>
+                  </div>
+                  
+                  {/* Desktop view for expenses */}
+                  <table className="w-full border-collapse hidden sm:table">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/20 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        <th className="py-3 px-5">Ref ID</th>
+                        <th className="py-3 px-5">Requested By (Phone)</th>
+                        <th className="py-3 px-5">Reason</th>
+                        <th className="py-3 px-5">Date</th>
+                        <th className="py-3 px-5">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60 text-xs text-foreground font-medium">
+                      {filteredExpenses.length === 0 ? (
+                        <tr><td colSpan={5} className="text-center py-10 text-muted-foreground">No expenses recorded in this range</td></tr>
+                      ) : (
+                        filteredExpenses.map(e => (
+                          <tr key={e.id} className="hover:bg-muted/15 transition-colors">
+                            <td className="py-3 px-5 font-mono text-[10px]">{e.id.substring(0, 8)}...</td>
+                            <td className="py-3 px-5 font-bold">{e.user_phone}</td>
+                            <td className="py-3 px-5">{e.reason}</td>
+                            <td className="py-3 px-5">{new Date(e.expense_date).toLocaleDateString()}</td>
+                            <td className="py-3 px-5 text-red-650 font-bold">₹{Number(e.amount).toLocaleString('en-IN')}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+
+                  {/* Mobile view for expenses */}
+                  <div className="block sm:hidden divide-y divide-border/60">
+                    {filteredExpenses.length === 0 ? (
+                      <p className="text-center py-10 text-xs text-muted-foreground">No expenses recorded in this range</p>
+                    ) : (
+                      filteredExpenses.map(e => (
+                        <div key={e.id} className="p-4 space-y-1.5 text-left">
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                            <span className="font-mono">{e.id.substring(0, 8)}...</span>
+                            <span>{new Date(e.expense_date).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <span className="font-bold text-foreground text-xs block">{e.user_phone}</span>
+                              <span className="text-xs text-muted-foreground block">{e.reason}</span>
+                            </div>
+                            <span className="font-bold text-red-650 text-xs">₹{Number(e.amount).toLocaleString('en-IN')}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Profitability / Net Revenue Summary Footer */}
+                  <div className="bg-muted/10 p-5 border-t border-border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs font-semibold">
+                    <div className="space-y-1 text-left">
+                      <p className="text-muted-foreground">Gross Collected Revenue: <strong className="text-foreground">₹{totalCollected.toLocaleString('en-IN')}</strong></p>
+                      <p className="text-muted-foreground">Total Expenses Deducted: <strong className="text-red-650">₹{totalExpenses.toLocaleString('en-IN')}</strong></p>
+                    </div>
+                    <div className="bg-primary/5 border border-primary/20 rounded-xl px-4 py-2.5 text-left">
+                      <span className="text-[10px] font-bold text-primary uppercase block">Net Turf Profitability</span>
+                      <span className="text-lg font-black text-primary">₹{netRevenue.toLocaleString('en-IN')}</span>
+                    </div>
                   </div>
                 </div>
               )}

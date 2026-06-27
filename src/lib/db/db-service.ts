@@ -1,7 +1,7 @@
 // Unified DB Service Layer
 import { hasSupabaseCredentials, supabase } from './supabase';
 import * as mockDb from './mock-db';
-import { Ground, Customer, Booking, Payment, ActivityLog, PaymentStatus, User } from './types';
+import { Ground, Customer, Booking, Payment, ActivityLog, PaymentStatus, User, Expense } from './types';
 
 // Hardcoded partners defined as fallback/direct accounts (bypassing Supabase SMTP limits)
 export const HARDCODED_PARTNERS: User[] = [];
@@ -646,6 +646,117 @@ export const updateGroundsRate = async (rate: number): Promise<void> => {
       console.error('Failed to update grounds in Supabase:', e);
     }
   }
+};
+
+// 7. Expense Services
+export const getExpenses = async (): Promise<Expense[]> => {
+  if (useSupabase() && supabase) {
+    const { data, error } = await supabase
+      .from('expenses')
+      .select('*')
+      .order('expense_date', { ascending: false });
+    
+    if (error) {
+      handleDbError(error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+    return data || [];
+  }
+  return mockDb.getExpenses();
+};
+
+export const createExpense = async (
+  expenseData: Omit<Expense, 'id' | 'created_at'>,
+  userEmail: string = 'dhameliyaavadh592@gmail.com'
+): Promise<Expense> => {
+  if (useSupabase() && supabase) {
+    const { data, error } = await supabase
+      .from('expenses')
+      .insert([expenseData])
+      .select()
+      .single();
+
+    if (error) {
+      handleDbError(error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+    
+    await logActivity(`Added expense of ₹${expenseData.amount} for "${expenseData.reason}" by ${expenseData.user_phone}`, userEmail);
+    return data;
+  }
+  return mockDb.createExpense(expenseData, userEmail);
+};
+
+export const updateExpense = async (
+  updatedExpense: Expense,
+  userEmail: string = 'dhameliyaavadh592@gmail.com'
+): Promise<Expense> => {
+  if (useSupabase() && supabase && !updatedExpense.id.startsWith('exp_')) {
+    const { data, error } = await supabase
+      .from('expenses')
+      .update(updatedExpense)
+      .eq('id', updatedExpense.id)
+      .select()
+      .single();
+
+    if (error) {
+      handleDbError(error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+
+    await logActivity(`Updated expense ${updatedExpense.id} details`, userEmail);
+    return data;
+  }
+  return mockDb.updateExpense(updatedExpense, userEmail);
+};
+
+export const deleteExpense = async (
+  expenseId: string,
+  userEmail: string = 'dhameliyaavadh592@gmail.com'
+): Promise<void> => {
+  if (useSupabase() && supabase && !expenseId.startsWith('exp_')) {
+    // Retrieve details for logging before deleting
+    const { data: expense } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('id', expenseId)
+      .single();
+
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', expenseId);
+
+    if (error) {
+      handleDbError(error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+
+    if (expense) {
+      await logActivity(`Deleted expense of ₹${expense.amount} for "${expense.reason}"`, userEmail);
+    } else {
+      await logActivity(`Deleted expense ${expenseId}`, userEmail);
+    }
+    return;
+  }
+  return mockDb.deleteExpense(expenseId, userEmail);
+};
+
+// Retrieve all admins and partners from users table
+export const getUsersList = async (): Promise<User[]> => {
+  if (useSupabase() && supabase) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('role', { ascending: true });
+    
+    if (error) {
+      handleDbError(error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+    return data || [];
+  }
+  return mockDb.getUsers();
 };
 
 
