@@ -196,8 +196,10 @@ export default function DashboardPage() {
     // Filter Bookings, Payments, Expenses for active period
     const periodBookings = rawBookings.filter(b => b.status !== 'Cancelled' && isWithinRange(b.booking_date));
     
-    // For payments, we parse payment_date timestamp to YYYY-MM-DD
-    const periodPayments = rawPayments.filter(p => isWithinRange(getLocalFormattedDateFromTimestamp(p.payment_date)));
+    const periodPayments = rawPayments.filter(p => {
+      const booking = rawBookings.find(b => b.id === p.booking_id);
+      return booking && isWithinRange(booking.booking_date);
+    });
     
     const periodExpenses = rawExpenses.filter(e => isWithinRange(e.expense_date));
 
@@ -306,12 +308,12 @@ export default function DashboardPage() {
           return bookStart >= startHourNum && bookStart < endHourNum;
         }).length;
 
-        // Payments in this hour range
+        // Payments in this hour range mapped to the booking start time
         const hourPaymentsCollected = rawPayments.filter(pay => {
-          const payDate = new Date(pay.payment_date);
-          const payDateStr = getLocalFormattedDate(payDate);
-          const payHour = payDate.getHours();
-          return payDateStr === filterDate && payHour >= startHourNum && payHour < endHourNum;
+          const booking = rawBookings.find(b => b.id === pay.booking_id);
+          if (!booking || booking.booking_date !== filterDate || booking.status === 'Cancelled') return false;
+          const bookStart = parseInt(booking.start_time.split(':')[0]);
+          return bookStart >= startHourNum && bookStart < endHourNum;
         }).reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
 
         trend.push({
@@ -335,8 +337,10 @@ export default function DashboardPage() {
         const label = d.toLocaleDateString(undefined, { weekday: 'short' });
 
         const dailyBookingsCount = rawBookings.filter(book => book.booking_date === dateStr && book.status !== 'Cancelled').length;
-        const dailyPaymentsCollected = rawPayments.filter(pay => getLocalFormattedDateFromTimestamp(pay.payment_date) === dateStr)
-                                        .reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
+        const dailyPaymentsCollected = rawPayments.filter(pay => {
+          const booking = rawBookings.find(b => b.id === pay.booking_id);
+          return booking && booking.booking_date === dateStr && booking.status !== 'Cancelled';
+        }).reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
 
         trend.push({
           name: label,
@@ -366,8 +370,10 @@ export default function DashboardPage() {
           const dateStr = getLocalFormattedDate(d);
           
           rangeBookings += rawBookings.filter(book => book.booking_date === dateStr && book.status !== 'Cancelled').length;
-          rangeRevenue += rawPayments.filter(pay => getLocalFormattedDateFromTimestamp(pay.payment_date) === dateStr)
-                            .reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
+          rangeRevenue += rawPayments.filter(pay => {
+            const booking = rawBookings.find(b => b.id === pay.booking_id);
+            return booking && booking.booking_date === dateStr && booking.status !== 'Cancelled';
+          }).reduce((sum, pay) => sum + Number(pay.amount_paid), 0);
         }
 
         trend.push({

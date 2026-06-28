@@ -338,8 +338,8 @@ export default function PaymentsPage() {
   const periodBookings = activeBookings.filter(b => isDateWithinFilter(b.booking_date));
   
   const periodPayments = payments.filter(p => {
-    const bookingExists = bookings.some(b => b.id === p.booking_id);
-    return bookingExists && isDateWithinFilter(getLocalFormattedDateFromTimestamp(p.payment_date));
+    const booking = bookings.find(b => b.id === p.booking_id);
+    return booking && isDateWithinFilter(booking.booking_date);
   });
   
   const totalOutstanding = periodBookings.reduce((sum, b) => {
@@ -436,7 +436,7 @@ export default function PaymentsPage() {
                         p.id.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchMethod = methodFilter === 'all' || p.payment_method === methodFilter;
-    const matchDate = isDateWithinFilter(getLocalFormattedDateFromTimestamp(p.payment_date));
+    const matchDate = booking ? isDateWithinFilter(booking.booking_date) : false;
     return matchSearch && matchMethod && matchDate;
   });
 
