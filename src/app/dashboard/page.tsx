@@ -97,6 +97,7 @@ export default function DashboardPage() {
     advanceUPI: 0,
     advanceCash: 0,
     monthlyRevenue: 0,
+    discountsGiven: 0,
     monthlyExpenses: 0,
     pendingPayments: 0,
     totalCustomers: 0
@@ -256,6 +257,8 @@ export default function DashboardPage() {
       }
     }
 
+    const discountsSum = periodBookings.reduce((sum, b) => sum + Number(b.discount), 0);
+
     setStats({
       todayBookings: periodBookings.length,
       todayRevenue: revenueSum,
@@ -263,6 +266,7 @@ export default function DashboardPage() {
       advanceUPI: periodAdvanceUPI,
       advanceCash: periodAdvanceCash,
       monthlyRevenue: bookingsValueSum, // Representing bookings value
+      discountsGiven: discountsSum,
       monthlyExpenses: expenseSum, // Period expenses
       pendingPayments: totalDues,
       totalCustomers: rawCustomers.length
@@ -501,7 +505,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Dynamic Metric Tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {/* Card 1 - Slots Booked */}
           <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Slots Booked</span>
@@ -509,6 +513,28 @@ export default function DashboardPage() {
               <span className="text-2xl font-extrabold text-foreground">{stats.todayBookings}</span>
               <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
                 Active
+              </span>
+            </div>
+          </div>
+
+          {/* Card 3 - Bookings Value */}
+          <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <span className="text-[10px] font-bold text-primary bg-accent/60 px-2 py-0.5 rounded-lg border border-primary/10 w-fit block">Bookings Value</span>
+            <div className="flex items-baseline gap-0.5 mt-3 text-left">
+              <IndianRupee className="h-5 w-5 text-primary shrink-0" />
+              <span className="text-2xl font-extrabold text-primary leading-tight">
+                {stats.monthlyRevenue.toLocaleString('en-IN')}
+              </span>
+            </div>
+          </div>
+
+          {/* Card - Discounts Given */}
+          <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-lg border border-border/80 w-fit block">Discounts Given</span>
+            <div className="flex items-baseline gap-0.5 mt-3 text-left">
+              <IndianRupee className="h-5 w-5 text-muted-foreground shrink-0" />
+              <span className="text-2xl font-extrabold text-foreground/80 leading-tight">
+                {stats.discountsGiven.toLocaleString('en-IN')}
               </span>
             </div>
           </div>
@@ -541,17 +567,6 @@ export default function DashboardPage() {
               <span className="text-muted-foreground font-semibold flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                 Cash: <strong className="text-foreground">₹{stats.advanceCash.toLocaleString('en-IN')}</strong>
-              </span>
-            </div>
-          </div>
-
-          {/* Card 3 - Bookings Value */}
-          <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-primary bg-accent/60 px-2 py-0.5 rounded-lg border border-primary/10 w-fit block">Bookings Value</span>
-            <div className="flex items-baseline gap-0.5 mt-3 text-left">
-              <IndianRupee className="h-5 w-5 text-primary shrink-0" />
-              <span className="text-2xl font-extrabold text-primary leading-tight">
-                {stats.monthlyRevenue.toLocaleString('en-IN')}
               </span>
             </div>
           </div>
