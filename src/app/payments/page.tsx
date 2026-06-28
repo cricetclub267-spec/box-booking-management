@@ -310,6 +310,30 @@ export default function PaymentsPage() {
   // Totals calculations based on active (non-cancelled) bookings and selected date filter
   const activeBookings = bookings.filter(b => b.status !== 'Cancelled');
 
+  // Helper to determine advance payment for a booking
+  const getAdvanceReceived = (bookingId: string): number => {
+    const bookingPayments = payments.filter(p => p.booking_id === bookingId);
+    if (bookingPayments.length === 0) return 0;
+
+    // Sort payments by payment_date ascending
+    const sortedPayments = [...bookingPayments].sort((a, b) => 
+      new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+    );
+
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) return 0;
+
+    const firstPayment = sortedPayments[0];
+    
+    // If there is only one payment and its amount is equal to or greater than the booking final_amount,
+    // it was a full payment, so advance is 0.
+    if (sortedPayments.length === 1 && Number(firstPayment.amount_paid) >= Number(booking.final_amount)) {
+      return 0;
+    }
+
+    return Number(firstPayment.amount_paid);
+  };
+
   // Filter bookings and payments for metrics according to the selected date filter
   const periodBookings = activeBookings.filter(b => isDateWithinFilter(b.booking_date));
   
@@ -333,6 +357,60 @@ export default function PaymentsPage() {
 
   const totalCash = periodPayments.filter(p => p.payment_method === 'Cash').reduce((sum, p) => {
     return sum + Number(p.amount_paid);
+  }, 0);
+
+  const totalAdvanceCollected = periodPayments.reduce((sum, p) => {
+    // Find all payments for this booking
+    const bookingPayments = payments.filter(pay => pay.booking_id === p.booking_id);
+    const sortedPayments = [...bookingPayments].sort((a, b) => 
+      new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+    );
+    
+    const firstPayment = sortedPayments[0];
+    // If current payment is the first payment of the booking
+    if (firstPayment && firstPayment.id === p.id) {
+      const booking = bookings.find(b => b.id === p.booking_id);
+      if (booking) {
+        // If it was a full payment, it's not an advance
+        if (sortedPayments.length === 1 && Number(firstPayment.amount_paid) >= Number(booking.final_amount)) {
+          return sum;
+        }
+        return sum + Number(p.amount_paid);
+      }
+    }
+    return sum;
+  }, 0);
+
+  const totalAdvanceUPI = periodPayments.reduce((sum, p) => {
+    const bookingPayments = payments.filter(pay => pay.booking_id === p.booking_id);
+    const sortedPayments = [...bookingPayments].sort((a, b) => 
+      new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+    );
+    
+    const firstPayment = sortedPayments[0];
+    if (firstPayment && firstPayment.id === p.id && p.payment_method === 'UPI') {
+      const booking = bookings.find(b => b.id === p.booking_id);
+      if (booking && !(sortedPayments.length === 1 && Number(firstPayment.amount_paid) >= Number(booking.final_amount))) {
+        return sum + Number(p.amount_paid);
+      }
+    }
+    return sum;
+  }, 0);
+
+  const totalAdvanceCash = periodPayments.reduce((sum, p) => {
+    const bookingPayments = payments.filter(pay => pay.booking_id === p.booking_id);
+    const sortedPayments = [...bookingPayments].sort((a, b) => 
+      new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+    );
+    
+    const firstPayment = sortedPayments[0];
+    if (firstPayment && firstPayment.id === p.id && p.payment_method === 'Cash') {
+      const booking = bookings.find(b => b.id === p.booking_id);
+      if (booking && !(sortedPayments.length === 1 && Number(firstPayment.amount_paid) >= Number(booking.final_amount))) {
+        return sum + Number(p.amount_paid);
+      }
+    }
+    return sum;
   }, 0);
 
   const totalDiscounts = periodBookings.reduce((sum, b) => sum + Number(b.discount), 0);
@@ -525,7 +603,7 @@ export default function PaymentsPage() {
         </div>
 
         {/* Financial Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm">
             <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 w-fit block">Collected Revenue</span>
             <div className="flex items-baseline gap-0.5 mt-2 text-left">
@@ -542,6 +620,26 @@ export default function PaymentsPage() {
               <span className="text-muted-foreground font-semibold flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                 Cash: <strong className="text-foreground">₹{totalCash.toLocaleString('en-IN')}</strong>
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm">
+            <span className="text-[10px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100 w-fit block">Advance Received</span>
+            <div className="flex items-baseline gap-0.5 mt-2 text-left">
+              <IndianRupee className="h-5 w-5 text-blue-700 shrink-0" />
+              <span className="text-xl font-bold text-blue-700 leading-tight">
+                {totalAdvanceCollected.toLocaleString('en-IN')}
+              </span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between text-[10px]">
+              <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                UPI: <strong className="text-foreground">₹{totalAdvanceUPI.toLocaleString('en-IN')}</strong>
+              </span>
+              <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                Cash: <strong className="text-foreground">₹{totalAdvanceCash.toLocaleString('en-IN')}</strong>
               </span>
             </div>
           </div>
@@ -697,9 +795,30 @@ export default function PaymentsPage() {
                             <span className="font-bold text-foreground block">{b.customer?.name}</span>
                             <span className="text-[10px] text-muted-foreground">{b.customer?.phone}</span>
                           </td>
-                          <td className="py-3.5 px-5">{new Date(b.booking_date).toLocaleDateString()}</td>
+                          <td className="py-3.5 px-5">
+                            <span className="block">{new Date(b.booking_date).toLocaleDateString()}</span>
+                            {(() => {
+                              const status = getBookingStatus(b);
+                              let statusStyle = 'text-blue-600 bg-blue-50 border-blue-100';
+                              if (status === 'Completed') statusStyle = 'text-emerald-700 bg-emerald-50 border-emerald-100';
+                              if (status === 'Running') statusStyle = 'text-amber-600 bg-amber-50 border-amber-100 animate-pulse';
+                              
+                              return (
+                                <span className={`inline-flex items-center px-1.5 py-0.25 mt-1 rounded-md border text-[8px] font-extrabold uppercase ${statusStyle}`}>
+                                  {status}
+                                </span>
+                              );
+                            })()}
+                          </td>
                           <td className="py-3.5 px-5">₹{Number(b.final_amount).toLocaleString('en-IN')}</td>
-                          <td className="py-3.5 px-5 text-emerald-700">₹{summary ? summary.totalPaid.toLocaleString('en-IN') : 0}</td>
+                          <td className="py-3.5 px-5 text-emerald-700">
+                            <span className="block">₹{summary ? summary.totalPaid.toLocaleString('en-IN') : 0}</span>
+                            {getAdvanceReceived(b.id) > 0 && (
+                              <span className="text-[10px] text-blue-600 font-bold block mt-0.5">
+                                Advance: ₹{getAdvanceReceived(b.id).toLocaleString('en-IN')}
+                              </span>
+                            )}
+                          </td>
                           <td className={`py-3.5 px-5 font-bold ${summary && summary.pendingAmount > 0 ? 'text-amber-600' : 'text-emerald-700'}`}>
                             ₹{summary ? summary.pendingAmount.toLocaleString('en-IN') : 0}
                           </td>
@@ -778,7 +897,12 @@ export default function PaymentsPage() {
                           </div>
                           <div>
                             <span className="text-[9px] text-muted-foreground block uppercase">Paid</span>
-                            <span className="font-semibold text-emerald-700">₹{summary ? summary.totalPaid.toLocaleString('en-IN') : 0}</span>
+                            <span className="font-semibold text-emerald-700 block">₹{summary ? summary.totalPaid.toLocaleString('en-IN') : 0}</span>
+                            {getAdvanceReceived(b.id) > 0 && (
+                              <span className="text-[8px] text-blue-600 font-bold block mt-0.5">
+                                Adv: ₹{getAdvanceReceived(b.id).toLocaleString('en-IN')}
+                              </span>
+                            )}
                           </div>
                           <div>
                             <span className="text-[9px] text-muted-foreground block uppercase">Pending</span>
@@ -788,7 +912,21 @@ export default function PaymentsPage() {
                           </div>
                         </div>
                         <div className="flex items-center justify-between pt-2 border-t border-border/40">
-                          <span className="text-xs text-muted-foreground">{new Date(b.booking_date).toLocaleDateString()}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">{new Date(b.booking_date).toLocaleDateString()}</span>
+                            {(() => {
+                              const status = getBookingStatus(b);
+                              let statusStyle = 'text-blue-600 bg-blue-50 border-blue-100';
+                              if (status === 'Completed') statusStyle = 'text-emerald-700 bg-emerald-50 border-emerald-100';
+                              if (status === 'Running') statusStyle = 'text-amber-600 bg-amber-50 border-amber-100 animate-pulse';
+                              
+                              return (
+                                <span className={`px-1.5 py-0.25 rounded-md border text-[8px] font-extrabold uppercase ${statusStyle}`}>
+                                  {status}
+                                </span>
+                              );
+                            })()}
+                          </div>
                           <div className="flex items-center gap-2">
                             {user?.role === 'admin' && summary && summary.pendingAmount > 0 ? (
                               <button
@@ -940,7 +1078,28 @@ export default function PaymentsPage() {
                               {p.payment_method}
                             </span>
                           </td>
-                          <td className="py-3.5 px-5 font-bold text-emerald-700">₹{Number(p.amount_paid).toLocaleString('en-IN')}</td>
+                          <td className="py-3.5 px-5 text-emerald-700">
+                            <span className="font-bold block">₹{Number(p.amount_paid).toLocaleString('en-IN')}</span>
+                            {(() => {
+                              const bookingPayments = payments.filter(pay => pay.booking_id === p.booking_id);
+                              const sortedPayments = [...bookingPayments].sort((a, b) => 
+                                new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+                              );
+                              const firstPayment = sortedPayments[0];
+                              if (firstPayment && firstPayment.id === p.id) {
+                                const booking = bookings.find(book => book.id === p.booking_id);
+                                if (booking && sortedPayments.length === 1 && Number(firstPayment.amount_paid) >= Number(booking.final_amount)) {
+                                  return null;
+                                }
+                                return (
+                                  <span className="text-[10px] text-blue-600 font-bold block mt-0.5">
+                                    (Advance)
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </td>
                           <td className="py-3.5 px-5 text-right">
                             {b && (
                               <button
@@ -989,7 +1148,26 @@ export default function PaymentsPage() {
                           </div>
                           <div className="text-right">
                             <span className="text-[9px] text-muted-foreground block uppercase">Amount</span>
-                            <span className="font-bold text-emerald-700 text-sm">₹{Number(p.amount_paid).toLocaleString('en-IN')}</span>
+                            <span className="font-bold text-emerald-700 text-sm block">₹{Number(p.amount_paid).toLocaleString('en-IN')}</span>
+                            {(() => {
+                              const bookingPayments = payments.filter(pay => pay.booking_id === p.booking_id);
+                              const sortedPayments = [...bookingPayments].sort((a, b) => 
+                                new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+                              );
+                              const firstPayment = sortedPayments[0];
+                              if (firstPayment && firstPayment.id === p.id) {
+                                const booking = bookings.find(book => book.id === p.booking_id);
+                                if (booking && sortedPayments.length === 1 && Number(firstPayment.amount_paid) >= Number(booking.final_amount)) {
+                                  return null;
+                                }
+                                return (
+                                  <span className="text-[8px] text-blue-600 font-bold block mt-0.5">
+                                    (Advance)
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         </div>
                         <div className="flex items-center justify-between pt-2 border-t border-border/40 text-xs">

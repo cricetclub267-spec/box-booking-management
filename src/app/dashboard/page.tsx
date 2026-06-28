@@ -93,6 +93,9 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({
     todayBookings: 0,
     todayRevenue: 0,
+    advanceCollected: 0,
+    advanceUPI: 0,
+    advanceCash: 0,
     monthlyRevenue: 0,
     monthlyExpenses: 0,
     pendingPayments: 0,
@@ -221,9 +224,44 @@ export default function DashboardPage() {
       totalDues += Math.max(0, finalAmount - totalPaid);
     }
 
+    // Calculate advance collected in the filtered period based on payment_date
+    let periodAdvanceTotal = 0;
+    let periodAdvanceUPI = 0;
+    let periodAdvanceCash = 0;
+
+    for (const p of periodPayments) {
+      // Find all payments for this booking to see if this payment is the first one
+      const bookingPayments = rawPayments.filter(pay => pay.booking_id === p.booking_id);
+      const sortedPayments = [...bookingPayments].sort((a, b) => 
+        new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()
+      );
+      
+      const firstPayment = sortedPayments[0];
+      // If current payment is the first payment of the booking
+      if (firstPayment && firstPayment.id === p.id) {
+        const booking = rawBookings.find(b => b.id === p.booking_id);
+        if (booking) {
+          // If it was a full payment, it's not an advance
+          if (sortedPayments.length === 1 && Number(firstPayment.amount_paid) >= Number(booking.final_amount)) {
+            continue;
+          }
+          const amt = Number(p.amount_paid);
+          periodAdvanceTotal += amt;
+          if (p.payment_method === 'UPI') {
+            periodAdvanceUPI += amt;
+          } else if (p.payment_method === 'Cash') {
+            periodAdvanceCash += amt;
+          }
+        }
+      }
+    }
+
     setStats({
       todayBookings: periodBookings.length,
       todayRevenue: revenueSum,
+      advanceCollected: periodAdvanceTotal,
+      advanceUPI: periodAdvanceUPI,
+      advanceCash: periodAdvanceCash,
       monthlyRevenue: bookingsValueSum, // Representing bookings value
       monthlyExpenses: expenseSum, // Period expenses
       pendingPayments: totalDues,
@@ -463,7 +501,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Dynamic Metric Tiles */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {/* Card 1 - Slots Booked */}
           <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Slots Booked</span>
@@ -482,6 +520,27 @@ export default function DashboardPage() {
               <IndianRupee className="h-5 w-5 text-emerald-700 shrink-0" />
               <span className="text-2xl font-extrabold text-emerald-700 leading-tight">
                 {stats.todayRevenue.toLocaleString('en-IN')}
+              </span>
+            </div>
+          </div>
+
+          {/* Card - Advance Received */}
+          <div className="bg-card border border-border/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+            <span className="text-[10px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100 w-fit block">Advance Received</span>
+            <div className="flex items-baseline gap-0.5 mt-3 text-left">
+              <IndianRupee className="h-5 w-5 text-blue-700 shrink-0" />
+              <span className="text-2xl font-extrabold text-blue-700 leading-tight">
+                {stats.advanceCollected.toLocaleString('en-IN')}
+              </span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between text-[10px]">
+              <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                UPI: <strong className="text-foreground">₹{stats.advanceUPI.toLocaleString('en-IN')}</strong>
+              </span>
+              <span className="text-muted-foreground font-semibold flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                Cash: <strong className="text-foreground">₹{stats.advanceCash.toLocaleString('en-IN')}</strong>
               </span>
             </div>
           </div>
